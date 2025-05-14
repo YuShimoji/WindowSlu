@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>WindowSlu ドキュメント</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="description" content="WindowSlu アプリケーションのドキュメント">
+  <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+  <!-- Docsifyのテーマ (vueテーマ) -->
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css">
+</head>
+<body>
+  <!-- Docsifyの描画コンテナ -->
+  <div id="app">読み込み中...</div>
+  <script>
+    window.$docsify = {
+      name: 'WindowSlu',
+      // GitHubリポジトリへのリンク (適宜変更してください)
+      // repo: 'YOUR_GITHUB_USERNAME/YOUR_REPOSITORY_NAME',
+      loadSidebar: true, // _sidebar.md を読み込む
+      alias: {
+        '/.*/_sidebar.md': '/_sidebar.md' // 常にルートの _sidebar.md を参照
+      },
+      subMaxLevel: 3,    // サイドバーに表示する目次の最大階層
+      auto2top: true,    // ページ切り替え時に自動でトップにスクロール
+      // coverpage: true, // カバーページを使用する場合
+    }
+  </script>
+  <!-- Docsifyのコアスクリプト -->
+  <script src="//cdn.jsdelivr.net/npm/docsify@4"></script>
+  <!-- プラグイン (例: コピーボタン) -->
+  <script src="//cdn.jsdelivr.net/npm/docsify-copy-code"></script>
+  <!-- プラグイン (例: 検索) -->
+  <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/search.min.js"></script>
+</body>
+</html> 

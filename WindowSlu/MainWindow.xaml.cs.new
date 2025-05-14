@@ -1,0 +1,285 @@
+using System;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using WindowSlu.Services;
+
+namespace WindowSlu
+{
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        // サービス
+        private WindowService windowService;
+        private NotifyIconService notifyIconService;
+
+        // 現在のテーマ（ライト/ダーク）
+        private bool isDarkTheme = true;
+
+        // 選択されたウィンドウのハンドル
+        private IntPtr selectedWindowHandle = IntPtr.Zero;
+
+        public MainWindow()
+        {
+            try
+            {
+                // コンポーネントの初期化
+                InitializeComponent();
+
+                // サービスの初期化
+                windowService = new WindowService();
+                notifyIconService = new NotifyIconService(this);
+
+                // ダークモードの初期設定
+                this.Background = new SolidColorBrush(Color.FromRgb(45, 45, 48)); // #2D2D30
+
+                // タイトルバーの背景色を設定
+                if (FindName("TitleBar") is Grid titleBar)
+                {
+                    titleBar.Background = new SolidColorBrush(Color.FromRgb(30, 30, 30)); // #1E1E1E
+                }
+
+                // ウィンドウ一覧の初期化はロード後に行う
+                this.Loaded += MainWindow_Loaded;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"初期化エラー: {ex.Message}");
+            }
+        }
+
+        // タイトルバーのマウスダウンイベント（ドラッグ用）
+        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            try
+            {
+                if (e.ChangedButton == MouseButton.Left)
+                {
+                    this.DragMove();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ドラッグエラー: {ex.Message}");
+            }
+        }
+
+        // テーマ切り替えボタンのクリックイベント
+        private void ThemeToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // テーマ切り替え機能は一時的に無効化
+                System.Windows.MessageBox.Show("テーマ切り替え機能は現在利用できません", "WindowSlu", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"テーマ切り替えエラー: {ex.Message}");
+            }
+        }
+
+        // テーマの適用
+        private void ApplyTheme()
+        {
+            // テーマ切り替え機能は一時的に無効化
+            Console.WriteLine("テーマ切り替え機能は一時的に無効化されています");
+        }
+
+        // タスクトレイ格納ボタンのクリックイベント
+        private void MinimizeToTrayButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                this.Hide();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"タスクトレイ格納エラー: {ex.Message}");
+            }
+        }
+
+        // 最小化ボタンのクリックイベント
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                this.WindowState = WindowState.Minimized;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"最小化エラー: {ex.Message}");
+            }
+        }
+
+        // 最大化ボタンのクリックイベント
+        private void MaximizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (this.WindowState == WindowState.Maximized)
+                {
+                    this.WindowState = WindowState.Normal;
+                    if (FindName("MaximizeButtonText") is TextBlock maximizeButtonText)
+                    {
+                        maximizeButtonText.Text = "□";
+                    }
+                }
+                else
+                {
+                    this.WindowState = WindowState.Maximized;
+                    if (FindName("MaximizeButtonText") is TextBlock maximizeButtonText)
+                    {
+                        maximizeButtonText.Text = "❐";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"最大化エラー: {ex.Message}");
+            }
+        }
+
+        // 閉じるボタンのクリックイベント
+        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                this.Close();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"閉じるエラー: {ex.Message}");
+            }
+        }
+
+        // 透明度スライダーの値変更イベント
+        private void TransparencySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            try
+            {
+                if (sender is Slider slider)
+                {
+                    IntPtr targetWindow = IntPtr.Zero;
+
+                    // 選択されているウィンドウがある場合はそれを対象に
+                    if (selectedWindowHandle != IntPtr.Zero)
+                    {
+                        targetWindow = selectedWindowHandle;
+                    }
+                    else
+                    {
+                        // アクティブウィンドウを対象に
+                        IntPtr activeWindow = windowService.GetActiveWindow();
+
+                        // 自分自身のウィンドウは対象外
+                        if (activeWindow == IntPtr.Zero || activeWindow == new System.Windows.Interop.WindowInteropHelper(this).Handle)
+                            return;
+
+                        targetWindow = activeWindow;
+                        selectedWindowHandle = activeWindow;
+                    }
+
+                    // ウィンドウの透明度を設定
+                    windowService.SetWindowTransparency(targetWindow, (byte)(e.NewValue * 2.55)); // 0-100 を 0-255 に変換
+                }
+            }
+            catch (Exception ex)
+            {
+                // エラーログ
+                Console.WriteLine($"透明度変更エラー: {ex.Message}");
+            }
+        }
+
+        // ウィンドウ一覧の更新ボタンクリック
+        private void RefreshWindowList_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                windowService.RefreshWindowList();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ウィンドウ一覧更新エラー: {ex.Message}");
+            }
+        }
+
+        // ウィンドウロード後の処理
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // ウィンドウ一覧の初期化
+                System.Windows.Controls.ListView? windowListView = FindName("WindowListView") as System.Windows.Controls.ListView;
+                if (windowListView != null)
+                {
+                    windowListView.ItemsSource = windowService.GetWindowList();
+                    windowService.RefreshWindowList();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ウィンドウロードエラー: {ex.Message}");
+            }
+        }
+
+        // ウィンドウ一覧の選択変更イベント
+        private void WindowListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                System.Windows.Controls.ListView? listView = sender as System.Windows.Controls.ListView;
+                if (listView != null && listView.SelectedItem is WindowInfo selectedWindow)
+                {
+                    selectedWindowHandle = selectedWindow.Handle;
+
+                    // 透明度スライダーの値を更新
+                    TransparencySlider.ValueChanged -= TransparencySlider_ValueChanged;
+                    TransparencySlider.Value = selectedWindow.Transparency;
+                    TransparencySlider.ValueChanged += TransparencySlider_ValueChanged;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ウィンドウ選択エラー: {ex.Message}");
+            }
+        }
+
+        // ショートカットキー適用ボタンクリック
+        private void ApplyShortcuts_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // ショートカットキーの適用処理はこれから実装
+                System.Windows.MessageBox.Show("ショートカットキー設定はこれから実装します。", "WindowSlu", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ショートカットキー適用エラー: {ex.Message}");
+            }
+        }
+
+        // ウィンドウが閉じられるときの処理
+        protected override void OnClosed(EventArgs e)
+        {
+            try
+            {
+                // タスクトレイアイコンの削除
+                notifyIconService.Dispose();
+                
+                // 注意: ここでApplication.Current.Shutdown()を呼び出すと無限ループになる可能性がある
+                // OnClosedは既に終了処理の一部として呼び出されているため
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"終了処理エラー: {ex.Message}");
+            }
+            finally
+            {
+                base.OnClosed(e);
+            }
+        }
+    }
+}

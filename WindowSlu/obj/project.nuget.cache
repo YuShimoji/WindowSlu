@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "BU+q1GCflgs=",
+  "success": true,
+  "projectFilePath": "D:\\App_Projects\\WindowSlu\\WindowSlu\\WindowSlu.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\thank\\.nuget\\packages\\microsoft.win32.systemevents\\6.0.0\\microsoft.win32.systemevents.6.0.0.nupkg.sha512",
+    "C:\\Users\\thank\\.nuget\\packages\\system.drawing.common\\6.0.0\\system.drawing.common.6.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

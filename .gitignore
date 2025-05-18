@@ -1,0 +1,176 @@
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Rider
+.idea/*
+!.idea/shelf
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+Log/
+
+# Visual Studio 2019 cache/options directory
+.vs/
+
+# Visual Studio 2022 cache/options directory
+.vsconfig
+
+# Build Results of an ATL Project
+[Dd]ebugPS/
+[Rr]eleasePS/
+DllData.c
+
+# MSTest test Results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.* 
+
+# NUnit
+*.VisualState.xml
+TestResult.xml
+
+# Subversion files
+.svn/
+
+# Office Temp Files
+~$*
+
+# Visual Studio profiler
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+# NuGet Packages
+*.nupkg
+# The packages folder can be ignored because of Package Restore
+**/[Pp]ackages/*
+# except build/, which is used as an MSBuild target.
+!**/[Pp]ackages/build/
+# Uncomment if necessary however generally it will be regenerated when needed
+#!**/[Pp]ackages/repositories.config
+# NuGet v3's project.json file needs to be saved as it contains package dependencies
+**/project.json
+# NuGet v3's project.lock.json file can be ignored as it is auto-generated
+**/project.lock.json
+
+# Dotcover Code Coverage supporting files
+*.dotcover
+
+# Paket dependency manager
+.paket/paket.exe
+paket-files/
+
+# FAKE - F# Make
+.fake/
+
+# Editor
+*.bak
+*.tmp
+
+# ReSharper supporting files
+*_i.ReSharper.user
+
+# BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
+
+# BenchmarkTool
+BenchmarkTool.Results/
+
+# ILSpy
+ILSpy.xml
+
+# Backup files from JetBrains tools
+*___jb_old___
+*___jb_bak___
+
+# Output folder from the `dotnet pack` command
+nupkg/
+
+# Folders from the `dotnet workload install` command
+~/.dotnet-workload/
+
+# cache folder for msbuild.microsoft.com resolver
+~/.cache/msbuild.microsoft.com/
+
+# cache folder for Microsoft.Extensions.Tools. आंतरिकTools.ToolManifestCache 
+~/.dotnet/ToolManifestCache
+
+# StyleCop
+StyleCop.Cache
+
+# Roslyn Analzyers
+*.ruleset
+
+# MyGet
+.myget/
+
+# Implicitly hidden files on macOS
+.DS_Store
+
+# Implicitly hidden files on Windows
+Thumbs.db
+Desktop.ini
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Rider Code Coverage
+*.rcov
+
+# Compiled files
+*.exe
+*.dll
+*.obj
+*.o
+*.a
+*.lib
+*.so
+*.dylib
+*.ncb
+*.sdf
+*.suo
+*.pdb
+*.idb
+*.ilk
+
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+
+# instance secrets kept under a secret manager server for dotnet
+secrets.json
+
+# Rider solution temp model files 
+*.sln.iml
+
+# Rider dot Cover
+*.dotCover
+
+# Add this rule to ignore .vs folder in the root directory
+/.vs/ 

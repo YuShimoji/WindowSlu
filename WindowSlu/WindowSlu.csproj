@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Resources\WindowSlu_Icon.ico" />
+    <Resource Include="Resources\WindowSlu_Icon.ico" />
   </ItemGroup>
 
 </Project>

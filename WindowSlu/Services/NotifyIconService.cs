@@ -1,6 +1,9 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Windows; // Required for Application.GetResourceStream
+using System.Windows.Resources; // Required for StreamResourceInfo
+using System.IO; // Required for Stream
 
 namespace WindowSlu.Services
 {
@@ -108,27 +111,29 @@ namespace WindowSlu.Services
         {
             try
             {
-                // アプリケーションの実行ファイルと同じディレクトリにあると仮定
-                // string iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "WindowSlu_Icon.ico");
-                // より確実な方法として、アセンブリの場所を取得する
-                string assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                string assemblyDirectory = System.IO.Path.GetDirectoryName(assemblyLocation) ?? "";
-                string iconPath = System.IO.Path.Combine(assemblyDirectory, "Resources", "WindowSlu_Icon.ico");
+                // Construct the pack URI for the embedded resource.
+                // Assumes 'Resources/WindowSlu_Icon.ico' is relative to the project root
+                // and the build action is set to 'Resource'.
+                Uri iconUri = new Uri("pack://application:,,,/Resources/WindowSlu_Icon.ico", UriKind.RelativeOrAbsolute);
+                StreamResourceInfo? streamInfo = System.Windows.Application.GetResourceStream(iconUri); // Fully qualify Application
 
-                if (System.IO.File.Exists(iconPath))
+                if (streamInfo != null)
                 {
-                    return new Icon(iconPath);
+                    using (Stream iconStream = streamInfo.Stream)
+                    {
+                        return new Icon(iconStream);
+                    }
                 }
                 else
                 {
-                    Console.WriteLine($"タスクトレイアイコンファイルが見つかりません: {iconPath}");
-                    return SystemIcons.Application; // フォールバック
+                    Console.WriteLine($"タスクトレイアイコンリソースが見つかりません: {iconUri}");
+                    return SystemIcons.Application; // Fallback
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"タスクトレイアイコン読み込みエラー: {ex.Message}");
-                return SystemIcons.Application; // フォールバック
+                Console.WriteLine($"タスクトレイアイコンリソース読み込みエラー: {ex.Message}");
+                return SystemIcons.Application; // Fallback
             }
         }
 

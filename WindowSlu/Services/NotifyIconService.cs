@@ -108,47 +108,26 @@ namespace WindowSlu.Services
         {
             try
             {
-                // アイコンのサイズ
-                int iconSize = 32;
+                // アプリケーションの実行ファイルと同じディレクトリにあると仮定
+                // string iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "WindowSlu_Icon.ico");
+                // より確実な方法として、アセンブリの場所を取得する
+                string assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                string assemblyDirectory = System.IO.Path.GetDirectoryName(assemblyLocation) ?? "";
+                string iconPath = System.IO.Path.Combine(assemblyDirectory, "Resources", "WindowSlu_Icon.ico");
 
-                // ビットマップを作成
-                using (Bitmap bitmap = new Bitmap(iconSize, iconSize))
+                if (System.IO.File.Exists(iconPath))
                 {
-                    using (Graphics g = Graphics.FromImage(bitmap))
-                    {
-                        // 背景を透明に
-                        g.Clear(Color.Transparent);
-
-                        // 円を描画
-                        using (SolidBrush brush = new SolidBrush(Color.FromArgb(0, 120, 215)))
-                        using (Pen pen = new Pen(Color.White, 2))
-                        {
-                            g.FillEllipse(brush, 4, 4, iconSize - 8, iconSize - 8);
-                            g.DrawEllipse(pen, 4, 4, iconSize - 8, iconSize - 8);
-                        }
-
-                        // 文字を描画
-                        using (Font font = new Font("Arial", 12, FontStyle.Bold))
-                        using (SolidBrush textBrush = new SolidBrush(Color.White))
-                        {
-                            StringFormat format = new StringFormat
-                            {
-                                Alignment = StringAlignment.Center,
-                                LineAlignment = StringAlignment.Center
-                            };
-
-                            g.DrawString("W", font, textBrush, new RectangleF(0, 0, iconSize, iconSize), format);
-                        }
-                    }
-
-                    // ビットマップからアイコンを作成
-                    IntPtr hIcon = bitmap.GetHicon();
-                    return Icon.FromHandle(hIcon);
+                    return new Icon(iconPath);
+                }
+                else
+                {
+                    Console.WriteLine($"タスクトレイアイコンファイルが見つかりません: {iconPath}");
+                    return SystemIcons.Application; // フォールバック
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"アイコン作成エラー: {ex.Message}");
+                Console.WriteLine($"タスクトレイアイコン読み込みエラー: {ex.Message}");
                 return SystemIcons.Application; // フォールバック
             }
         }

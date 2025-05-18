@@ -25,6 +25,7 @@
         <Grid Grid.Row="0" x:Name="TitleBar" Background="{DynamicResource TitleBarColor}" MouseDown="TitleBar_MouseDown">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
@@ -33,39 +34,42 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
+            <!-- アイコン (追加) -->
+            <Image Source="Resources/WindowSlu_Icon.ico" Width="18" Height="18" VerticalAlignment="Center" Margin="5,0,5,0" Grid.Column="0" />
+
             <!-- タイトル -->
-            <TextBlock Grid.Column="0" Text="WindowSlu"
-                       VerticalAlignment="Center" Margin="10,0,0,0" FontWeight="Bold" />
+            <TextBlock Grid.Column="1" Text="WindowSlu"
+                       VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="Bold" />
 
             <!-- 余白 -->
-            <Grid Grid.Column="1" />
+            <Grid Grid.Column="2" />
 
             <!-- ダークモード/ライトモード切り替えボタン -->
-            <Button x:Name="ThemeToggleButton" Grid.Column="2" Width="30" Height="30"
+            <Button x:Name="ThemeToggleButton" Grid.Column="3" Width="30" Height="30"
                     Style="{StaticResource TransparentButtonStyle}" Click="ThemeToggleButton_Click">
                 <TextBlock x:Name="ThemeToggleText" Text="🌓" FontSize="16" />
             </Button>
 
             <!-- タスクトレイ格納ボタン -->
-            <Button x:Name="MinimizeToTrayButton" Grid.Column="3" Width="30" Height="30"
+            <Button x:Name="MinimizeToTrayButton" Grid.Column="4" Width="30" Height="30"
                     Style="{StaticResource TransparentButtonStyle}" Click="MinimizeToTrayButton_Click">
                 <TextBlock Text="💻" FontSize="16" />
             </Button>
 
             <!-- 最小化ボタン -->
-            <Button x:Name="MinimizeButton" Grid.Column="4" Width="30" Height="30"
+            <Button x:Name="MinimizeButton" Grid.Column="5" Width="30" Height="30"
                     Style="{StaticResource TransparentButtonStyle}" Click="MinimizeButton_Click">
                 <TextBlock Text="−" FontSize="16" />
             </Button>
 
             <!-- 最大化/元のサイズに戻すボタン -->
-            <Button x:Name="MaximizeButton" Grid.Column="5" Width="30" Height="30"
+            <Button x:Name="MaximizeButton" Grid.Column="6" Width="30" Height="30"
                     Style="{StaticResource TransparentButtonStyle}" Click="MaximizeButton_Click">
                 <TextBlock x:Name="MaximizeButtonText" Text="□" FontSize="16" />
             </Button>
 
             <!-- 閉じるボタン -->
-            <Button x:Name="CloseButton" Grid.Column="6" Width="30" Height="30"
+            <Button x:Name="CloseButton" Grid.Column="7" Width="30" Height="30"
                     Style="{StaticResource TransparentButtonStyle}" Click="CloseButton_Click">
                 <TextBlock Text="✕" FontSize="16" />
             </Button>

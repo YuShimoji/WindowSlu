@@ -1,0 +1,23 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <SolidColorBrush x:Key="BackgroundColor" Color="#2D2D30"/>
+    <SolidColorBrush x:Key="ForegroundColor" Color="#E6E6E6"/>
+    <SolidColorBrush x:Key="BorderColor" Color="#3F3F46"/>
+    <SolidColorBrush x:Key="ControlColor" Color="#333337"/>
+    <SolidColorBrush x:Key="ControlBorderColor" Color="#4D4D50"/>
+    <SolidColorBrush x:Key="HighlightColor" Color="#007ACC"/>
+    <SolidColorBrush x:Key="ListBackgroundColor" Color="#252526"/>
+    <SolidColorBrush x:Key="ListItemColor" Color="#2D2D30"/>
+    <SolidColorBrush x:Key="ListItemSelectedColor" Color="#3F3F46"/>
+    <SolidColorBrush x:Key="TabBackgroundColor" Color="#252526"/>
+    <SolidColorBrush x:Key="TabSelectedColor" Color="#2D2D30"/>
+    <SolidColorBrush x:Key="TitleBarColor" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="TabSelectedTextColor" Color="White"/>
+
+    <!-- ScrollBar Colors -->
+    <SolidColorBrush x:Key="ScrollBarBackgroundColor" Color="#252526"/>
+    <SolidColorBrush x:Key="ScrollBarThumbColor" Color="#4D4D50"/>
+
+</ResourceDictionary>
+ 

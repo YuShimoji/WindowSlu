@@ -1,0 +1,24 @@
+[
+    // (settings.json の一部の例)
+    {
+        "Keys": "Alt+Up",
+        "Action": "DecreaseTransparency",
+        "Parameter": 10
+    },
+    {
+        "Keys": "Alt+Down",
+        "Action": "IncreaseTransparency",
+        "Parameter": 10
+    },
+    {
+        "Keys": "Ctrl+Alt+Home", // 例
+        "Action": "ToggleTopMost",
+        "Parameter": 0 // ToggleTopMost では Parameter は使用されません
+    },
+    // (settings.json の一部の例)
+    {
+        "Keys": "Ctrl+Alt+C", // 例: ClickThrough の C
+        "Action": "ToggleClickThrough",
+        "Parameter": 0 // ToggleClickThrough では Parameter は使用されません
+    }
+]

@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "NDyRfp0eMjA=",
+  "success": true,
+  "projectFilePath": "D:\\App_Projects\\WindowSlu_New\\WindowSlu\\WindowSlu.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\thank\\.nuget\\packages\\hardcodet.notifyicon.wpf\\2.0.1\\hardcodet.notifyicon.wpf.2.0.1.nupkg.sha512"
+  ],
+  "logs": []
+}

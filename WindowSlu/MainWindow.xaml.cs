@@ -27,17 +27,33 @@ namespace WindowSlu
         private WindowInfo? _selectedWindowInfo;
         private readonly WindowService _windowService;
         private readonly ThemeService _themeService;
+        private readonly SettingsService _settingsService;
+        private HotkeyService? _hotkeyService;
         private Services.Theme _currentTheme = Services.Theme.Dark;
         private IntPtr _hwnd;
         private HwndSource? _hwndSource;
         private Hardcodet.Wpf.TaskbarNotification.TaskbarIcon? MyNotifyIcon;
+        private ContextMenu? _contextMenu;
+        private MenuItem? _showMenuItem;
+        private MenuItem? _exitMenuItem;
 
         public MainWindow()
         {
+            LoggingService.LogInfo("MainWindow constructor called.");
             InitializeComponent();
             DataContext = this;
+            
             _windowService = new WindowService();
             _themeService = new ThemeService();
+            _settingsService = new SettingsService();
+
+            // Apply saved theme
+            if (Enum.TryParse<Services.Theme>(_settingsService.Settings.Theme, out var savedTheme))
+            {
+                _currentTheme = savedTheme;
+                _themeService.ApplyTheme(_currentTheme);
+            }
+
             _updateTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromSeconds(2)
@@ -48,27 +64,108 @@ namespace WindowSlu
             Closed += MainWindow_Closed;
         }
 
+        private void HandleHotkey(HotkeyAction action, int parameter)
+        {
+            IntPtr foregroundWindow = WindowService.GetForegroundWindow();
+            if (foregroundWindow == IntPtr.Zero)
+            {
+                LoggingService.LogInfo("No foreground window found.");
+                return;
+            }
+
+            if (foregroundWindow == _hwnd)
+            {
+                LoggingService.LogInfo("Skipping hotkey action on main application window to prevent unintended side effects.");
+                return;
+            }
+
+            LoggingService.LogInfo($"Operating on foreground window: {foregroundWindow}");
+
+            switch (action)
+            {
+                case HotkeyAction.IncreaseOpacity:
+                    {
+                        int currentOpacity = _windowService.GetTransparency(foregroundWindow);
+                        _windowService.SetTransparency(foregroundWindow, Math.Min(100, currentOpacity + parameter));
+                        break;
+                    }
+                case HotkeyAction.DecreaseOpacity:
+                    {
+                        int currentOpacity = _windowService.GetTransparency(foregroundWindow);
+                        _windowService.SetTransparency(foregroundWindow, Math.Max(0, currentOpacity - parameter));
+                        break;
+                    }
+                case HotkeyAction.SetOpacity:
+                    {
+                        _windowService.SetTransparency(foregroundWindow, parameter);
+                        break;
+                    }
+                case HotkeyAction.ToggleTopMost:
+                    _windowService.ToggleTopMost(foregroundWindow);
+                    break;
+                case HotkeyAction.ToggleClickThrough:
+                    _windowService.ToggleClickThrough(foregroundWindow);
+                    break;
+            }
+        }
+
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            LoggingService.LogInfo("MainWindow_Loaded event triggered.");
+            // Restore window position and size
+            this.Left = _settingsService.Settings.WindowLeft;
+            this.Top = _settingsService.Settings.WindowTop;
+            this.Width = _settingsService.Settings.WindowWidth;
+            this.Height = _settingsService.Settings.WindowHeight;
+
             _hwnd = new WindowInteropHelper(this).EnsureHandle();
-            _hwndSource = HwndSource.FromHwnd(_hwnd);
+            _hotkeyService = new HotkeyService(_hwnd, _settingsService, _windowService, HandleHotkey);
+            
             try
             {
                 MyNotifyIcon = (Hardcodet.Wpf.TaskbarNotification.TaskbarIcon)FindResource("NotifyIcon");
-                System.Diagnostics.Debug.WriteLine("[DEBUG] NotifyIcon loaded successfully.");
+                if (MyNotifyIcon != null)
+                {
+                    _contextMenu = new ContextMenu();
+                    _showMenuItem = new MenuItem { Header = "Show" };
+                    _showMenuItem.Click += ShowMenuItem_Click;
+                    _exitMenuItem = new MenuItem { Header = "Exit" };
+                    _exitMenuItem.Click += ExitMenuItem_Click;
+                    _contextMenu.Items.Add(_showMenuItem);
+                    _contextMenu.Items.Add(_exitMenuItem);
+                    MyNotifyIcon.ContextMenu = _contextMenu;
+                }
+            }
+            catch (ResourceReferenceKeyNotFoundException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DEBUG] Failed to load NotifyIcon from resources. It might be created later. Details: {ex.Message}");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[DEBUG] Failed to load NotifyIcon: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[DEBUG] An unexpected error occurred with NotifyIcon: {ex.Message}");
             }
+            
             await RefreshWindowList();
             _updateTimer.Start();
         }
 
-        private void MainWindow_Closed(object sender, EventArgs e)
+        private void MainWindow_Closed(object? sender, EventArgs e)
         {
+            LoggingService.LogInfo("Main window closing. Disposing resources.");
+            _hotkeyService?.Dispose();
+
+            // Save window position and size
+            _settingsService.Settings.WindowLeft = this.Left;
+            _settingsService.Settings.WindowTop = this.Top;
+            _settingsService.Settings.WindowWidth = this.Width;
+            _settingsService.Settings.WindowHeight = this.Height;
+
+            // Save current theme
+            _settingsService.Settings.Theme = _currentTheme.ToString();
+            
+            _settingsService.SaveSettings();
+
             _updateTimer?.Stop();
-            _hwndSource?.Dispose();
             MyNotifyIcon?.Dispose();
         }
 
@@ -90,13 +187,14 @@ namespace WindowSlu
                     if (existing == null)
                     {
                         window.Opacity = _windowService.GetTransparency(window.Handle);
-                        window.IsTopMost = (WindowService.GetWindowLong(window.Handle, -20) & 0x8) != 0;
+                        window.IsTopMost = _windowService.IsTopMost(window.Handle);
+                        window.IsClickThrough = _windowService.IsClickThrough(window.Handle);
                         Windows.Add(window);
                     }
                     else
                     {
                         existing.Title = window.Title;
-                        bool isActuallyTopMost = (WindowService.GetWindowLong(window.Handle, -20) & 0x8) != 0;
+                        bool isActuallyTopMost = _windowService.IsTopMost(window.Handle);
                         if (existing.IsTopMost != isActuallyTopMost)
                         {
                             existing.IsTopMost = isActuallyTopMost;
@@ -138,7 +236,7 @@ namespace WindowSlu
         private void MinimizeButton_Click(object sender, RoutedEventArgs e) { WindowState = WindowState.Minimized; }
         private void MaximizeButton_Click(object sender, RoutedEventArgs e) { WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized; }
         private void CloseButton_Click(object sender, RoutedEventArgs e) { Close(); }
-        private void WindowListView_SelectionChanged(object sender, SelectionChangedEventArgs e) { _selectedWindowInfo = WindowListView.SelectedItem as WindowInfo; }
+        private void WindowListView_SelectionChanged(object sender, SelectionChangedEventArgs e) { _selectedWindowInfo = (sender as ListView)?.SelectedItem as WindowInfo; }
         private void PinButton_Click(object sender, RoutedEventArgs e) { if (sender is Button btn && btn.DataContext is WindowInfo info) ToggleTopMost(info.Handle); }
         private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) 
         { 
@@ -148,7 +246,11 @@ namespace WindowSlu
                 SetTransparency(info.Handle, (int)e.NewValue); 
             }
         }
-        private void ThemeToggleButton_Click(object sender, RoutedEventArgs e) { _currentTheme = _currentTheme == Services.Theme.Dark ? Services.Theme.Light : Services.Theme.Dark; _themeService.ApplyTheme(_currentTheme); }
+        private void ThemeToggleButton_Click(object sender, RoutedEventArgs e) 
+        {
+            _currentTheme = _currentTheme == Services.Theme.Dark ? Services.Theme.Light : Services.Theme.Dark; 
+            _themeService.ApplyTheme(_currentTheme);
+        }
         
         // --- Tray Icon ---
         private void TrayButton_Click(object sender, RoutedEventArgs e) { if(MyNotifyIcon != null) { Hide(); MyNotifyIcon.Visibility = Visibility.Visible; } }

@@ -1,11 +1,11 @@
-namespace WindowSlu
+namespace WindowSlu.Models
 {
     public enum HotkeyAction
     {
         None,
-        ToggleTransparency,
-        IncreaseTransparency,
-        DecreaseTransparency,
+        SetOpacity,
+        IncreaseOpacity,
+        DecreaseOpacity,
         ToggleTopMost,
         ToggleClickThrough
     }

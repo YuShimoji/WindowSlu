@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Input;
+using WindowSlu.Models;
 
 namespace WindowSlu.Services
 {
@@ -16,9 +17,50 @@ namespace WindowSlu.Services
         private List<RegisteredHotkey> _registeredHotkeys = new List<RegisteredHotkey>();
         private static int _currentHotkeyId = 1;
 
+        // Windows Hooking related fields
+        private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
+        private static IntPtr _hookID = IntPtr.Zero;
+        private LowLevelKeyboardProc _proc;
+
+        private const int WH_KEYBOARD_LL = 13;
+        private const int WM_KEYDOWN = 0x0100;
+        private const int WM_SYSKEYDOWN = 0x0104;
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr GetModuleHandle(string lpModuleName);
+
         [DllImport("user32.dll")]
+        private static extern short GetKeyState(int nVirtKey);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct KBDLLHOOKSTRUCT
+        {
+            public uint vkCode;
+            public uint scanCode;
+            public uint flags;
+            public uint time;
+            public IntPtr dwExtraInfo;
+        }
+
+        private const int VK_SHIFT = 0x10;
+        private const int VK_CONTROL = 0x11;
+        private const int VK_MENU = 0x12; // Alt key
+        private const uint LLKHF_ALTDOWN = 0x20;
+
+        // Old RegisterHotKey fields - will be removed or refactored
+        [DllImport("user32.dll", SetLastError = true)]
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
-        [DllImport("user32.dll")]
+        [DllImport("user32.dll", SetLastError = true)]
         private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
         private const uint MOD_NONE = 0x0000;
@@ -29,135 +71,105 @@ namespace WindowSlu.Services
 
         public HotkeyService(IntPtr windowHandle, SettingsService settingsService, WindowService windowService, Action<HotkeyAction, int> hotkeyCallback)
         {
-            _windowHandle = windowHandle;
+            _proc = HookCallback;
+            _hookID = SetHook(_proc);
             _settingsService = settingsService;
             _windowService = windowService;
             _hotkeyCallback = hotkeyCallback;
+            ReloadSettings(); // Loads the hotkey configurations to be checked against in the hook
         }
 
-        public bool RegisterHotkey(string keys, HotkeyAction action, int parameter)
+        private IntPtr SetHook(LowLevelKeyboardProc proc)
         {
-            if (_windowHandle == IntPtr.Zero) return false;
-
-            try
+            using (Process curProcess = Process.GetCurrentProcess())
+            using (ProcessModule curModule = curProcess.MainModule)
             {
-                KeyGestureConverter gestureConverter = new KeyGestureConverter();
-                KeyGesture? gesture = gestureConverter.ConvertFromString(keys) as KeyGesture;
+                return SetWindowsHookEx(WH_KEYBOARD_LL, proc, GetModuleHandle(curModule.ModuleName), 0);
+            }
+        }
 
-                if (gesture != null)
+        private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+        {
+            if (nCode >= 0 && (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN))
+            {
+                KBDLLHOOKSTRUCT kbdStruct = (KBDLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(KBDLLHOOKSTRUCT));
+                Key key = KeyInterop.KeyFromVirtualKey((int)kbdStruct.vkCode);
+
+                ModifierKeys modifiers = ModifierKeys.None;
+                if ((GetKeyState(VK_CONTROL) & 0x8000) != 0) modifiers |= ModifierKeys.Control;
+                if ((GetKeyState(VK_SHIFT) & 0x8000) != 0) modifiers |= ModifierKeys.Shift;
+                if ((kbdStruct.flags & LLKHF_ALTDOWN) != 0) modifiers |= ModifierKeys.Alt;
+
+                // Check against registered hotkeys
+                foreach (var hotkey in _registeredHotkeys)
                 {
-                    uint modifiers = MOD_NONE;
-                    if ((gesture.Modifiers & ModifierKeys.Control) == ModifierKeys.Control) modifiers |= MOD_CONTROL;
-                    if ((gesture.Modifiers & ModifierKeys.Alt) == ModifierKeys.Alt) modifiers |= MOD_ALT;
-                    if ((gesture.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift) modifiers |= MOD_SHIFT;
-                    if ((gesture.Modifiers & ModifierKeys.Windows) == ModifierKeys.Windows) modifiers |= MOD_WIN;
-
-                    int virtualKey = KeyInterop.VirtualKeyFromKey(gesture.Key);
-                    if (virtualKey == 0) 
+                    if (hotkey.IsEnabled && key == hotkey.Key && modifiers == hotkey.Modifiers)
                     {
-                        LoggingService.LogError($"Could not convert key {gesture.Key} to virtual key for hotkey '{keys}'.");
-                        return false;
-                    }
-
-                    int hotkeyId = _currentHotkeyId++;
-                    LoggingService.LogInfo($"Attempting to register OS hotkey ID {hotkeyId} for '{keys}' (Mods: {modifiers}, VK: {virtualKey}) on HWND {_windowHandle}.");
-                    if (RegisterHotKey(_windowHandle, hotkeyId, modifiers, (uint)virtualKey))
-                    {
-                        _registeredHotkeys.Add(new RegisteredHotkey { Id = hotkeyId, Keys = keys, Action = action, Parameter = parameter, Gesture = gesture });
-                        LoggingService.LogInfo($"SUCCESSFULLY registered OS hotkey ID {hotkeyId}: '{keys}' -> {action} (Param: {parameter}).");
-                        return true;
-                    }
-                    else
-                    {
-                        int errorCode = Marshal.GetLastWin32Error();
-                        LoggingService.LogError($"FAILED to register OS hotkey ID {hotkeyId} for '{keys}'. Win32Error: {errorCode}.");
-                        _currentHotkeyId--;
-                        return false;
+                        LoggingService.LogInfo($"Hotkey combination {hotkey.Modifiers}+{hotkey.Key} detected for action {hotkey.Action}");
+                        _hotkeyCallback?.Invoke(hotkey.Action, hotkey.Parameter);
                     }
                 }
-                else
-                {
-                    LoggingService.LogError($"Could not parse key gesture string: '{keys}'.");
-                }
             }
-            catch (Exception ex)
-            {
-                LoggingService.LogError($"Exception registering hotkey '{keys}': {ex.Message}");
-            }
-            return false;
+            return CallNextHookEx(_hookID, nCode, wParam, lParam);
         }
-
-        public void UnregisterAllHotkeys()
-        {
-            if (_windowHandle == IntPtr.Zero) return;
-
-            foreach (var hotkey in _registeredHotkeys)
-            {
-                UnregisterHotKey(_windowHandle, hotkey.Id);
-                LoggingService.LogInfo($"Unregistered hotkey ID {hotkey.Id}: '{hotkey.Keys}'.");
-            }
-            _registeredHotkeys.Clear();
-            LoggingService.LogInfo("All hotkeys unregistered.");
-        }
-
+        
         public void ReloadSettings()
         {
-            UnregisterAllHotkeys();
-            var hotkeySettings = _settingsService.GetHotkeySettings();
-            if (hotkeySettings != null)
+            // This method no longer registers OS-level hotkeys, but just reloads the settings.
+            LoggingService.LogInfo("Reloading hotkey settings into service.");
+            var settings = _settingsService.Settings.HotkeySettings;
+            _registeredHotkeys.Clear();
+            if (settings != null)
             {
-                foreach (var setting in hotkeySettings)
+                foreach (var setting in settings)
                 {
-                    if (!string.IsNullOrEmpty(setting.Keys))
+                     // For backward compatibility
+                    if (setting.Key == Key.None && !string.IsNullOrEmpty(setting.Keys))
                     {
-                        RegisterHotkey(setting.Keys, setting.Action, setting.Parameter);
+                        try
+                        {
+                            var gesture = (KeyGesture)new KeyGestureConverter().ConvertFromString(setting.Keys);
+                            if(gesture != null) {
+                                setting.Key = gesture.Key;
+                                setting.Modifiers = gesture.Modifiers;
+                            }
+                        }
+                        catch(Exception ex) {
+                            LoggingService.LogError($"Could not parse legacy key gesture: {ex.Message}");
+                            continue;
+                        }
+                    }
+                    if(setting.IsEnabled)
+                    {
+                        _registeredHotkeys.Add(new RegisteredHotkey {
+                            Id = _currentHotkeyId++, // Keep for internal reference if needed
+                            Action = setting.Action,
+                            Key = setting.Key,
+                            Modifiers = setting.Modifiers,
+                            Parameter = setting.Parameter,
+                            IsEnabled = setting.IsEnabled
+                        });
+                        LoggingService.LogInfo($"Loaded hotkey setting: {setting.Modifiers}+{setting.Key} for action {setting.Action}");
                     }
                 }
-            }
-        }
-
-        public bool AreHotkeysRegistered()
-        {
-            return _registeredHotkeys.Any();
-        }
-
-        public void HandleHotkeyMessage(int msg, IntPtr wParam, IntPtr lParam)
-        {
-            const int WM_HOTKEY = 0x0312;
-            if (msg == WM_HOTKEY)
-            {
-                int hotkeyId = wParam.ToInt32();
-                ProcessHotkey(hotkeyId);
-            }
-        }
-
-        private void ProcessHotkey(int hotkeyIdFromWndProc)
-        {
-            var hotkey = _registeredHotkeys.FirstOrDefault(rh => rh.Id == hotkeyIdFromWndProc);
-            if (hotkey != null)
-            {
-                LoggingService.LogInfo($"Matched WM_HOTKEY ID {hotkeyIdFromWndProc} to action {hotkey.Action}. Invoking callback.");
-                _hotkeyCallback?.Invoke(hotkey.Action, hotkey.Parameter);
-            }
-            else
-            {
-                LoggingService.LogInfo($"Received WM_HOTKEY with unknown ID {hotkeyIdFromWndProc}.");
             }
         }
 
         public void Dispose()
         {
-            UnregisterAllHotkeys();
+            UnhookWindowsHookEx(_hookID);
+            LoggingService.LogInfo("Keyboard hook released.");
             GC.SuppressFinalize(this);
         }
 
         private class RegisteredHotkey
         {
             public int Id { get; set; }
-            public string? Keys { get; set; }
             public HotkeyAction Action { get; set; }
+            public Key Key { get; set; }
+            public ModifierKeys Modifiers { get; set; }
             public int Parameter { get; set; }
-            public KeyGesture? Gesture { get; set; }
+            public bool IsEnabled { get; set; }
         }
     }
 } 

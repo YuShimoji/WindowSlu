@@ -1,10 +1,16 @@
-namespace WindowSlu
+using System.Text.Json.Serialization;
+using System.Windows.Input;
+
+namespace WindowSlu.Models
 {
     public class HotkeySetting
     {
+        public HotkeyAction Action { get; set; }
         public string Keys { get; set; } = string.Empty;
-        public HotkeyAction Action { get; set; } = HotkeyAction.None;
         public int Parameter { get; set; }
+        public bool IsEnabled { get; set; } = true;
+        public Key Key { get; set; }
+        public ModifierKeys Modifiers { get; set; }
 
         public HotkeySetting()
         {

@@ -1,69 +1,48 @@
 using System;
 using System.IO;
-using System.Text;
-using System.Diagnostics;
 
 namespace WindowSlu.Services
 {
     public static class LoggingService
     {
-        private static readonly string LogFilePath = Path.Combine(AppContext.BaseDirectory, "debug_output.log");
-        private static readonly string errorLogFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "error.log");
-        private static readonly object lockObject = new object();
-        private const string EventLogSource = "WindowSluApp";
+        private static readonly string LogFilePath;
+        private static readonly object _lock = new object();
 
-        public static void LogInfo(string message)
+        static LoggingService()
         {
-            Log("INFO", message);
+            // ログファイルのパスを %AppData%\WindowSlu\Logs に設定
+            string logDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "WindowSlu", "Logs");
+            Directory.CreateDirectory(logDirectory); // フォルダがなければ作成
+            LogFilePath = Path.Combine(logDirectory, $"log_{DateTime.Now:yyyyMMdd}.txt");
         }
 
-        public static void LogError(string message, Exception? ex = null)
+        private static void WriteLine(string level, string message)
         {
-            Log("ERROR", message);
-            if (ex != null)
-            {
-                Log("ERROR", $"Exception details: {ex}");
-            }
-        }
-
-        private static void Log(string level, string message)
-        {
-            try
-            {
-                string logMessage = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} - [{level}] {message}{Environment.NewLine}";
-                File.AppendAllText(LogFilePath, logMessage);
-            }
-            catch
-            {
-                // ログ書き込みに失敗した場合は無視
-            }
-        }
-
-        private static void LogErrorToEventLog(string message, Exception? ex = null)
+            // スレッドセーフにファイルに書き込む
+            lock (_lock)
             {
                 try
                 {
-                    // EventSource が存在しない場合は作成 (管理者権限が必要な場合がある)
-                    if (!EventLog.SourceExists(EventLogSource))
+                    using (var writer = new StreamWriter(LogFilePath, true))
                     {
-                        EventLog.CreateEventSource(EventLogSource, "Application");
+                        writer.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{level}] {message}");
                     }
-
-                    StringBuilder eventLogMessage = new StringBuilder();
-                    eventLogMessage.AppendLine($"!!! LoggingService Critical Error: Failed to write to log file. Path: {errorLogFilePath} !!!");
-                eventLogMessage.AppendLine($"LoggingService Error Details: {ex?.ToString() ?? "N/A"}");
-                    eventLogMessage.AppendLine($"Original Error attempting to log: Message='{message}', Exception='{ex?.ToString() ?? "N/A"}'");
-
-                    EventLog.WriteEntry(EventLogSource, eventLogMessage.ToString(), EventLogEntryType.Error);
                 }
-                catch (Exception eventLogEx)
+                catch (Exception)
                 {
-                    // If writing to EventLog also fails, there's not much more we can do.
-                    // Avoid further Console.WriteLine to prevent potential loops or further issues in production.
-                    Debug.WriteLine($"!!! LoggingService Critical Error: Failed to write to EventLog. EventLogException: {eventLogEx.ToString()} !!!");
-                Debug.WriteLine($"Original LoggingService Error: {ex?.ToString() ?? "N/A"}");
-                    Debug.WriteLine($"Original Error attempting to log: Message='{message}', Exception='{ex?.ToString() ?? "N/A"}'");
+                    // ログの書き込み自体でエラーが発生した場合は、なにもしない
+                }
             }
+        }
+
+        public static void LogInfo(string message)
+        {
+            WriteLine("INFO", message);
+        }
+
+        public static void LogError(string message)
+        {
+            WriteLine("ERROR", message);
         }
     }
 } 

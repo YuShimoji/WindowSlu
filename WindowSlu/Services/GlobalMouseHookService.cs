@@ -52,7 +52,7 @@ namespace WindowSlu.Services
             {
                 if (curModule == null)
                 {
-                    LoggingService.LogError("Failed to get current process MainModule for setting hook.", null); // Exception can be null
+                    LoggingService.LogError("Failed to get current process MainModule for setting hook.");
                     return IntPtr.Zero;
                 }
                 return SetWindowsHookEx(WH_MOUSE_LL, proc, GetModuleHandle(curModule.ModuleName), 0);
@@ -146,7 +146,7 @@ namespace WindowSlu.Services
                 else
                 {
                     int errorCode = Marshal.GetLastWin32Error();
-                    LoggingService.LogError("Failed to unhook global mouse hook.", new Win32Exception(errorCode));
+                    LoggingService.LogError($"Failed to unhook global mouse hook. Win32Error: {errorCode}");
                 }
                 _hookID = IntPtr.Zero;
             }

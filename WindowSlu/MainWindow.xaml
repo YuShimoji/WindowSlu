@@ -10,8 +10,7 @@
         Title="WindowSlu" Height="450" Width="800"
         Icon="/Assets/WindowSlu.ico"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        ResizeMode="CanResizeWithGrip"
-        Loaded="MainWindow_Loaded">
+        ResizeMode="CanResizeWithGrip">
 
     <Window.Resources>
         <converters:BoolToTopMostTextConverter x:Key="BoolToTopMostTextConverter"/>

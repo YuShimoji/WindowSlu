@@ -11,6 +11,7 @@ using System.Windows.Interop;
 using System.Windows.Threading;
 using WindowSlu.Models;
 using WindowSlu.Services;
+using WindowSlu.ViewModels;
 using Button = System.Windows.Controls.Button;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -23,7 +24,6 @@ namespace WindowSlu
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
         private readonly DispatcherTimer _updateTimer;
-        public ObservableCollection<WindowInfo> Windows { get; } = new ObservableCollection<WindowInfo>();
         private WindowInfo? _selectedWindowInfo;
         private readonly WindowService _windowService;
         private readonly ThemeService _themeService;
@@ -31,21 +31,24 @@ namespace WindowSlu
         private HotkeyService? _hotkeyService;
         private Services.Theme _currentTheme = Services.Theme.Dark;
         private IntPtr _hwnd;
-        private HwndSource? _hwndSource;
         private Hardcodet.Wpf.TaskbarNotification.TaskbarIcon? MyNotifyIcon;
         private ContextMenu? _contextMenu;
         private MenuItem? _showMenuItem;
         private MenuItem? _exitMenuItem;
+        private readonly MainViewModel _viewModel;
+        private DispatcherTimer? _indicatorTimer;
 
         public MainWindow()
         {
             LoggingService.LogInfo("MainWindow constructor called.");
             InitializeComponent();
-            DataContext = this;
+            InitializeIndicatorTimer();
             
             _windowService = new WindowService();
             _themeService = new ThemeService();
             _settingsService = new SettingsService();
+            _viewModel = new MainViewModel(_settingsService, this);
+            this.DataContext = _viewModel;
 
             // Apply saved theme
             if (Enum.TryParse<Services.Theme>(_settingsService.Settings.Theme, out var savedTheme))
@@ -62,6 +65,33 @@ namespace WindowSlu
             
             Loaded += MainWindow_Loaded;
             Closed += MainWindow_Closed;
+        }
+
+        private void InitializeIndicatorTimer()
+        {
+            _indicatorTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(1)
+            };
+            _indicatorTimer.Tick += (s, e) =>
+            {
+                if(TransparencyIndicator != null)
+                {
+                    TransparencyIndicator.Visibility = Visibility.Collapsed;
+                }
+                _indicatorTimer.Stop();
+            };
+        }
+
+        public void ShowTransparencyIndicator(int newOpacity)
+        {
+            if (TransparencyIndicator != null && TransparencyValueText != null)
+            {
+                TransparencyValueText.Text = $"{newOpacity}%";
+                TransparencyIndicator.Visibility = Visibility.Visible;
+                _indicatorTimer?.Stop();
+                _indicatorTimer?.Start();
+            }
         }
 
         private void HandleHotkey(HotkeyAction action, int parameter)
@@ -86,18 +116,23 @@ namespace WindowSlu
                 case HotkeyAction.IncreaseOpacity:
                     {
                         int currentOpacity = _windowService.GetTransparency(foregroundWindow);
-                        _windowService.SetTransparency(foregroundWindow, Math.Min(100, currentOpacity + parameter));
+                        int newOpacity = Math.Min(100, currentOpacity + parameter);
+                        _windowService.SetTransparency(foregroundWindow, newOpacity);
+                        ShowTransparencyIndicator(newOpacity);
                         break;
                     }
                 case HotkeyAction.DecreaseOpacity:
                     {
                         int currentOpacity = _windowService.GetTransparency(foregroundWindow);
-                        _windowService.SetTransparency(foregroundWindow, Math.Max(0, currentOpacity - parameter));
+                        int newOpacity = Math.Max(0, currentOpacity - parameter);
+                        _windowService.SetTransparency(foregroundWindow, newOpacity);
+                        ShowTransparencyIndicator(newOpacity);
                         break;
                     }
                 case HotkeyAction.SetOpacity:
                     {
                         _windowService.SetTransparency(foregroundWindow, parameter);
+                        ShowTransparencyIndicator(parameter);
                         break;
                     }
                 case HotkeyAction.ToggleTopMost:
@@ -105,6 +140,20 @@ namespace WindowSlu
                     break;
                 case HotkeyAction.ToggleClickThrough:
                     _windowService.ToggleClickThrough(foregroundWindow);
+                    break;
+                case HotkeyAction.SetAllTo80:
+                    if (DataContext is MainViewModel viewModel)
+                    {
+                        foreach (var windowInfo in viewModel.Windows)
+                        {
+                            // To prevent changing the main window's opacity
+                            if (windowInfo.Handle != _hwnd)
+                            {
+                                SetTransparency(windowInfo.Handle, 80);
+                            }
+                        }
+                        viewModel.StatusText = "すべてのウィンドウの透明度を80%に設定しました。";
+                    }
                     break;
             }
         }
@@ -119,7 +168,7 @@ namespace WindowSlu
             this.Height = _settingsService.Settings.WindowHeight;
 
             _hwnd = new WindowInteropHelper(this).EnsureHandle();
-            _hotkeyService = new HotkeyService(_hwnd, _settingsService, _windowService, HandleHotkey);
+            _hotkeyService = new HotkeyService(_settingsService, _windowService, HandleHotkey);
             
             try
             {
@@ -149,7 +198,7 @@ namespace WindowSlu
             _updateTimer.Start();
         }
 
-        private void MainWindow_Closed(object? sender, EventArgs e)
+        private void MainWindow_Closed(object sender, EventArgs e)
         {
             LoggingService.LogInfo("Main window closing. Disposing resources.");
             _hotkeyService?.Dispose();
@@ -178,18 +227,18 @@ namespace WindowSlu
             // Using Application.Current.Dispatcher to be explicit.
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                var currentHandles = new HashSet<IntPtr>(Windows.Select(w => w.Handle));
+                var currentHandles = new HashSet<IntPtr>(_viewModel.Windows.Select(w => w.Handle));
                 var newHandles = new HashSet<IntPtr>(newWindows.Select(w => w.Handle));
 
                 foreach (var window in newWindows)
                 {
-                    var existing = Windows.FirstOrDefault(w => w.Handle == window.Handle);
+                    var existing = _viewModel.Windows.FirstOrDefault(w => w.Handle == window.Handle);
                     if (existing == null)
                     {
                         window.Opacity = _windowService.GetTransparency(window.Handle);
                         window.IsTopMost = _windowService.IsTopMost(window.Handle);
                         window.IsClickThrough = _windowService.IsClickThrough(window.Handle);
-                        Windows.Add(window);
+                        _viewModel.Windows.Add(window);
                     }
                     else
                     {
@@ -207,10 +256,10 @@ namespace WindowSlu
                     }
                 }
 
-                var removedWindows = Windows.Where(w => !newHandles.Contains(w.Handle)).ToList();
+                var removedWindows = _viewModel.Windows.Where(w => !newHandles.Contains(w.Handle)).ToList();
                 foreach (var removed in removedWindows)
                 {
-                    Windows.Remove(removed);
+                    _viewModel.Windows.Remove(removed);
                 }
             });
         }
@@ -219,7 +268,7 @@ namespace WindowSlu
         {
             if (hWnd == IntPtr.Zero) return;
             _windowService.SetTransparency(hWnd, percent);
-            var windowInfo = Windows.FirstOrDefault(w => w.Handle == hWnd);
+            var windowInfo = _viewModel.Windows.FirstOrDefault(w => w.Handle == hWnd);
             if (windowInfo != null) windowInfo.Opacity = percent;
         }
 
@@ -227,7 +276,7 @@ namespace WindowSlu
         {
             if (hWnd == IntPtr.Zero) return;
             _windowService.ToggleTopMost(hWnd);
-            var windowInfo = Windows.FirstOrDefault(w => w.Handle == hWnd);
+            var windowInfo = _viewModel.Windows.FirstOrDefault(w => w.Handle == hWnd);
             if (windowInfo != null) windowInfo.IsTopMost = !windowInfo.IsTopMost;
         }
 
@@ -237,7 +286,21 @@ namespace WindowSlu
         private void MaximizeButton_Click(object sender, RoutedEventArgs e) { WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized; }
         private void CloseButton_Click(object sender, RoutedEventArgs e) { Close(); }
         private void WindowListView_SelectionChanged(object sender, SelectionChangedEventArgs e) { _selectedWindowInfo = (sender as ListView)?.SelectedItem as WindowInfo; }
-        private void PinButton_Click(object sender, RoutedEventArgs e) { if (sender is Button btn && btn.DataContext is WindowInfo info) ToggleTopMost(info.Handle); }
+        private void PinButton_Click(object sender, RoutedEventArgs e) 
+        { 
+            if (sender is FrameworkElement element && element.DataContext is WindowInfo info) 
+            {
+                ToggleTopMost(info.Handle); 
+            }
+        }
+        private void ClickThroughButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is WindowInfo info)
+            {
+                _windowService.ToggleClickThrough(info.Handle);
+                info.IsClickThrough = !info.IsClickThrough;
+            }
+        }
         private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) 
         { 
             if (sender is Slider slider && slider.DataContext is WindowInfo info) 
@@ -258,6 +321,11 @@ namespace WindowSlu
         private void NotifyIcon_DoubleClick(object sender, RoutedEventArgs e) { ShowWindow(); }
         private void ShowMenuItem_Click(object sender, RoutedEventArgs e) { ShowWindow(); }
         private void ExitMenuItem_Click(object sender, RoutedEventArgs e) { Close(); }
+
+        private void LightTheme_Click(object sender, RoutedEventArgs e)
+        {
+            // ... existing code ...
+        }
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged(string propertyName) { PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName)); }

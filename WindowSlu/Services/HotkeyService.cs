@@ -10,7 +10,6 @@ namespace WindowSlu.Services
 {
     public class HotkeyService : IDisposable
     {
-        private IntPtr _windowHandle;
         private SettingsService _settingsService;
         private WindowService _windowService;
         private Action<HotkeyAction, int> _hotkeyCallback;
@@ -69,7 +68,7 @@ namespace WindowSlu.Services
         private const uint MOD_SHIFT = 0x0004;
         private const uint MOD_WIN = 0x0008;
 
-        public HotkeyService(IntPtr windowHandle, SettingsService settingsService, WindowService windowService, Action<HotkeyAction, int> hotkeyCallback)
+        public HotkeyService(SettingsService settingsService, WindowService windowService, Action<HotkeyAction, int> hotkeyCallback)
         {
             _proc = HookCallback;
             _hookID = SetHook(_proc);
@@ -112,7 +111,7 @@ namespace WindowSlu.Services
             }
             return CallNextHookEx(_hookID, nCode, wParam, lParam);
         }
-        
+
         public void ReloadSettings()
         {
             // This method no longer registers OS-level hotkeys, but just reloads the settings.
@@ -123,7 +122,7 @@ namespace WindowSlu.Services
             {
                 foreach (var setting in settings)
                 {
-                     // For backward compatibility
+                    // For backward compatibility
                     if (setting.Key == Key.None && !string.IsNullOrEmpty(setting.Keys))
                     {
                         try

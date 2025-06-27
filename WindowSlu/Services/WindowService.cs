@@ -48,7 +48,7 @@ namespace WindowSlu.Services
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
-
+        
         [DllImport("dwmapi.dll")]
         private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out bool pvAttribute, int cbAttribute);
 
@@ -141,7 +141,7 @@ namespace WindowSlu.Services
             if (!GetLayeredWindowAttributes(hWnd, out _, out byte alpha, out uint dwFlags) || (dwFlags & LWA_ALPHA) == 0)
             {
                 // エラーが発生した場合、またはアルファが設定されていない場合は、100%を返す
-                return 100;
+            return 100;
             }
             
             return (int)Math.Round(alpha / 2.55);

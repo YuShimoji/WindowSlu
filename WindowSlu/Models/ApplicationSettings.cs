@@ -27,6 +27,7 @@ namespace WindowSlu.Models
             new HotkeySetting("Ctrl+Alt+Up", HotkeyAction.IncreaseOpacity, 10),
             new HotkeySetting("Ctrl+Alt+Down", HotkeyAction.DecreaseOpacity, 10),
             new HotkeySetting("Ctrl+Alt+0", HotkeyAction.SetOpacity, 100),
+            new HotkeySetting("Alt+Shift+A", HotkeyAction.SetAllTo80),
             new HotkeySetting("Ctrl+Alt+T", HotkeyAction.ToggleTopMost),
             new HotkeySetting("Ctrl+Alt+C", HotkeyAction.ToggleClickThrough)
         };

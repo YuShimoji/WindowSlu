@@ -18,25 +18,26 @@ namespace WindowSlu
     {
         public void ChangeTheme(Theme theme)
         {
+            // Get the current merged dictionaries
             var dictionaries = Resources.MergedDictionaries;
-
-            // 既存のテーマディクショナリを削除
-            var oldTheme = dictionaries.FirstOrDefault(d =>
+            
+            // Clear all theme-related dictionaries to avoid conflicts
+            var oldThemes = dictionaries.Where(d =>
                 d.Source != null && (d.Source.OriginalString.Contains("LightTheme.xaml") || d.Source.OriginalString.Contains("DarkTheme.xaml"))
-            );
-
-            if (oldTheme != null)
+            ).ToList();
+            
+            foreach (var oldTheme in oldThemes)
             {
                 dictionaries.Remove(oldTheme);
             }
 
-            // 新しいテーマディクショナリを追加
+            // Add the new theme dictionary
             var themeName = theme == Theme.Light ? "LightTheme" : "DarkTheme";
-            var dict = new ResourceDictionary
+            var newThemeDict = new ResourceDictionary
             {
                 Source = new Uri($"Themes/{themeName}.xaml", UriKind.Relative)
             };
-            dictionaries.Add(dict);
+            dictionaries.Add(newThemeDict);
         }
 
         public App()
@@ -50,9 +51,18 @@ namespace WindowSlu
 
             // アプリケーション終了時にイベントハンドラを解除
             this.Exit += (s, e) => { SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged; };
+        }
 
-            // 起動時に現在のシステムテーマを適用
+        protected override void OnStartup(StartupEventArgs e)
+        {
+            base.OnStartup(e);
+
+            // Apply the theme at startup
             ApplySystemTheme();
+
+            // Create and show the main window
+            var mainWindow = new MainWindow();
+            mainWindow.Show();
         }
 
         private void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
@@ -90,18 +100,27 @@ namespace WindowSlu
 
         private void App_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
         {
-            // 例外情報をコンソールに出力
+            // Show a message box with the exception details
+            var errorMessage = $"An unexpected error occurred: {e.Exception.Message}\n\n{e.Exception.StackTrace}";
+            MessageBox.Show(errorMessage, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            
+            // Log the exception (optional)
             Console.WriteLine($"DispatcherUnhandledException: {e.Exception.Message}");
             Console.WriteLine($"StackTrace: {e.Exception.StackTrace}");
 
-            // 例外を処理済みとしてマーク
+            // Mark the exception as handled to prevent the application from crashing
             e.Handled = true;
         }
 
         private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
-            // 例外情報をコンソールに出力
-            if (e.ExceptionObject is Exception ex)
+            // Show a message box with the exception details
+            var ex = e.ExceptionObject as Exception;
+            var errorMessage = $"A critical unhandled error occurred: {(ex != null ? ex.Message : e.ExceptionObject.ToString())}\n\n{(ex != null ? ex.StackTrace : string.Empty)}";
+            MessageBox.Show(errorMessage, "Critical Error", MessageBoxButton.OK, MessageBoxImage.Error);
+
+            // Log the exception (optional)
+            if (ex != null)
             {
                 Console.WriteLine($"UnhandledException: {ex.Message}");
                 Console.WriteLine($"StackTrace: {ex.StackTrace}");

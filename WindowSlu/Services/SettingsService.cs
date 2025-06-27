@@ -4,6 +4,7 @@ using System.IO;
 using System.Text.Json;
 using System.Windows.Input;
 using WindowSlu.Models;
+using System.Linq;
 
 namespace WindowSlu.Services
 {
@@ -19,10 +20,10 @@ namespace WindowSlu.Services
             Directory.CreateDirectory(appFolderPath);
             _settingsFilePath = Path.Combine(appFolderPath, "settings.json");
 
-            Settings = LoadSettings();
+            LoadSettings();
         }
 
-        private ApplicationSettings LoadSettings()
+        private void LoadSettings()
         {
             if (File.Exists(_settingsFilePath))
             {
@@ -30,28 +31,43 @@ namespace WindowSlu.Services
                 {
                     string json = File.ReadAllText(_settingsFilePath);
                     var settings = JsonSerializer.Deserialize<ApplicationSettings>(json);
-                    return settings ?? new ApplicationSettings();
+                    Settings = settings ?? CreateAndSaveDefaultSettings();
+
+                    // Merge hotkeys after loading
+                    if (MergeMissingHotkeys(Settings))
+                    {
+                        SaveSettings(Settings);
+                    }
                 }
-                catch (JsonException)
+                catch (Exception) // Catch broader exceptions for file corruption or access issues
                 {
-                    // If file is corrupted, return default settings
-                    return new ApplicationSettings();
-                }
-                catch (IOException)
-                {
-                    // If file is inaccessible, return default settings
-                    return new ApplicationSettings();
+                    Settings = CreateAndSaveDefaultSettings();
                 }
             }
-            return new ApplicationSettings();
+            else
+            {
+                Settings = CreateAndSaveDefaultSettings();
+            }
+        }
+        
+        private ApplicationSettings CreateAndSaveDefaultSettings()
+        {
+            var defaultSettings = new ApplicationSettings();
+            SaveSettings(defaultSettings);
+            return defaultSettings;
         }
 
         public void SaveSettings()
         {
+            SaveSettings(Settings);
+        }
+
+        private void SaveSettings(ApplicationSettings settings)
+        {
             try
             {
-                var options = new JsonSerializerOptions { WriteIndented = true };
-                string json = JsonSerializer.Serialize(Settings, options);
+                var options = new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+                string json = JsonSerializer.Serialize(settings, options);
                 File.WriteAllText(_settingsFilePath, json);
             }
             catch (IOException)
@@ -60,6 +76,25 @@ namespace WindowSlu.Services
             }
         }
 
+        private bool MergeMissingHotkeys(ApplicationSettings loadedSettings)
+        {
+            bool settingsUpdated = false;
+            var defaultSettings = new ApplicationSettings();
+
+            foreach (var defaultHotkey in defaultSettings.HotkeySettings)
+            {
+                if (!loadedSettings.HotkeySettings.Any(h => h.Action == defaultHotkey.Action))
+                {
+                    loadedSettings.HotkeySettings.Add(defaultHotkey);
+                    settingsUpdated = true;
+                }
+            }
+
+            return settingsUpdated;
+        }
+
+        // This method is redundant as default settings are now defined in ApplicationSettings.cs
+        /*
         private HotkeySetting[] GetDefaultHotkeySettings()
         {
             return new HotkeySetting[]
@@ -70,5 +105,6 @@ namespace WindowSlu.Services
                 new HotkeySetting { Action = HotkeyAction.ToggleClickThrough,Key = Key.C,     Modifiers = ModifierKeys.Control | ModifierKeys.Alt, Parameter = 0,  Keys = "Ctrl+Alt+C" },
             };
         }
+        */
     }
 } 

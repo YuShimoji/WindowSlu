@@ -7,6 +7,7 @@ namespace WindowSlu.Models
         IncreaseOpacity,
         DecreaseOpacity,
         ToggleTopMost,
-        ToggleClickThrough
+        ToggleClickThrough,
+        SetAllTo80
     }
 } 

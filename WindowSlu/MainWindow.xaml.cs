@@ -23,9 +23,7 @@ namespace WindowSlu
     /// </summary>
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
-        private readonly DispatcherTimer _updateTimer;
         private WindowInfo? _selectedWindowInfo;
-        private readonly WindowService _windowService;
         private readonly ThemeService _themeService;
         private readonly SettingsService _settingsService;
         private HotkeyService? _hotkeyService;
@@ -44,10 +42,10 @@ namespace WindowSlu
             InitializeComponent();
             InitializeIndicatorTimer();
             
-            _windowService = new WindowService();
+            var windowService = new WindowService();
             _themeService = new ThemeService();
             _settingsService = new SettingsService();
-            _viewModel = new MainViewModel(_settingsService, this);
+            _viewModel = new MainViewModel(_settingsService, windowService, this);
             this.DataContext = _viewModel;
 
             // Apply saved theme
@@ -57,12 +55,6 @@ namespace WindowSlu
                 _themeService.ApplyTheme(_currentTheme);
             }
 
-            _updateTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromSeconds(2)
-            };
-            _updateTimer.Tick += async (s, e) => await RefreshWindowList();
-            
             Loaded += MainWindow_Loaded;
             Closed += MainWindow_Closed;
         }
@@ -115,31 +107,31 @@ namespace WindowSlu
             {
                 case HotkeyAction.IncreaseOpacity:
                     {
-                        int currentOpacity = _windowService.GetTransparency(foregroundWindow);
+                        int currentOpacity = _viewModel.WindowService.GetTransparency(foregroundWindow);
                         int newOpacity = Math.Min(100, currentOpacity + parameter);
-                        _windowService.SetTransparency(foregroundWindow, newOpacity);
+                        _viewModel.WindowService.SetTransparency(foregroundWindow, newOpacity);
                         ShowTransparencyIndicator(newOpacity);
                         break;
                     }
                 case HotkeyAction.DecreaseOpacity:
                     {
-                        int currentOpacity = _windowService.GetTransparency(foregroundWindow);
+                        int currentOpacity = _viewModel.WindowService.GetTransparency(foregroundWindow);
                         int newOpacity = Math.Max(0, currentOpacity - parameter);
-                        _windowService.SetTransparency(foregroundWindow, newOpacity);
+                        _viewModel.WindowService.SetTransparency(foregroundWindow, newOpacity);
                         ShowTransparencyIndicator(newOpacity);
                         break;
                     }
                 case HotkeyAction.SetOpacity:
                     {
-                        _windowService.SetTransparency(foregroundWindow, parameter);
+                        _viewModel.WindowService.SetTransparency(foregroundWindow, parameter);
                         ShowTransparencyIndicator(parameter);
                         break;
                     }
                 case HotkeyAction.ToggleTopMost:
-                    _windowService.ToggleTopMost(foregroundWindow);
+                    _viewModel.WindowService.ToggleTopMost(foregroundWindow);
                     break;
                 case HotkeyAction.ToggleClickThrough:
-                    _windowService.ToggleClickThrough(foregroundWindow);
+                    _viewModel.WindowService.ToggleClickThrough(foregroundWindow);
                     break;
                 case HotkeyAction.SetAllTo80:
                     if (DataContext is MainViewModel viewModel)
@@ -168,7 +160,7 @@ namespace WindowSlu
             this.Height = _settingsService.Settings.WindowHeight;
 
             _hwnd = new WindowInteropHelper(this).EnsureHandle();
-            _hotkeyService = new HotkeyService(_settingsService, _windowService, HandleHotkey);
+            _hotkeyService = new HotkeyService(_settingsService, _viewModel.WindowService, HandleHotkey);
             
             try
             {
@@ -194,8 +186,8 @@ namespace WindowSlu
                 System.Diagnostics.Debug.WriteLine($"[DEBUG] An unexpected error occurred with NotifyIcon: {ex.Message}");
             }
             
-            await RefreshWindowList();
-            _updateTimer.Start();
+            await _viewModel.RefreshWindowList();
+            _viewModel.Start();
         }
 
         private void MainWindow_Closed(object sender, EventArgs e)
@@ -214,60 +206,14 @@ namespace WindowSlu
             
             _settingsService.SaveSettings();
 
-            _updateTimer?.Stop();
+            _viewModel.Stop();
             MyNotifyIcon?.Dispose();
-        }
-
-        private async Task RefreshWindowList()
-        {
-            var newWindows = await Task.Run(() => _windowService.GetAllWindows());
-            System.Diagnostics.Debug.WriteLine($"[DEBUG] Found {newWindows.Count} windows.");
-
-            // The UI update needs to happen on the UI thread.
-            // Using Application.Current.Dispatcher to be explicit.
-            await Application.Current.Dispatcher.InvokeAsync(() =>
-            {
-                var currentHandles = new HashSet<IntPtr>(_viewModel.Windows.Select(w => w.Handle));
-                var newHandles = new HashSet<IntPtr>(newWindows.Select(w => w.Handle));
-
-                foreach (var window in newWindows)
-                {
-                    var existing = _viewModel.Windows.FirstOrDefault(w => w.Handle == window.Handle);
-                    if (existing == null)
-                    {
-                        window.Opacity = _windowService.GetTransparency(window.Handle);
-                        window.IsTopMost = _windowService.IsTopMost(window.Handle);
-                        window.IsClickThrough = _windowService.IsClickThrough(window.Handle);
-                        _viewModel.Windows.Add(window);
-                    }
-                    else
-                    {
-                        existing.Title = window.Title;
-                        bool isActuallyTopMost = _windowService.IsTopMost(window.Handle);
-                        if (existing.IsTopMost != isActuallyTopMost)
-                        {
-                            existing.IsTopMost = isActuallyTopMost;
-                        }
-                        int currentOpacity = _windowService.GetTransparency(window.Handle);
-                        if (existing.Opacity != currentOpacity)
-                        {
-                            existing.Opacity = currentOpacity;
-                        }
-                    }
-                }
-
-                var removedWindows = _viewModel.Windows.Where(w => !newHandles.Contains(w.Handle)).ToList();
-                foreach (var removed in removedWindows)
-                {
-                    _viewModel.Windows.Remove(removed);
-                }
-            });
         }
         
         private void SetTransparency(IntPtr hWnd, int percent)
         {
             if (hWnd == IntPtr.Zero) return;
-            _windowService.SetTransparency(hWnd, percent);
+            _viewModel.WindowService.SetTransparency(hWnd, percent);
             var windowInfo = _viewModel.Windows.FirstOrDefault(w => w.Handle == hWnd);
             if (windowInfo != null) windowInfo.Opacity = percent;
         }
@@ -275,7 +221,7 @@ namespace WindowSlu
         private void ToggleTopMost(IntPtr hWnd)
         {
             if (hWnd == IntPtr.Zero) return;
-            _windowService.ToggleTopMost(hWnd);
+            _viewModel.WindowService.ToggleTopMost(hWnd);
             var windowInfo = _viewModel.Windows.FirstOrDefault(w => w.Handle == hWnd);
             if (windowInfo != null) windowInfo.IsTopMost = !windowInfo.IsTopMost;
         }
@@ -297,7 +243,7 @@ namespace WindowSlu
         {
             if (sender is FrameworkElement element && element.DataContext is WindowInfo info)
             {
-                _windowService.ToggleClickThrough(info.Handle);
+                _viewModel.WindowService.ToggleClickThrough(info.Handle);
                 info.IsClickThrough = !info.IsClickThrough;
             }
         }

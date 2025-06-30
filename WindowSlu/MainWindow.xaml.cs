@@ -129,22 +129,37 @@ namespace WindowSlu
                     }
                 case HotkeyAction.ToggleTopMost:
                     _viewModel.WindowService.ToggleTopMost(foregroundWindow);
+                    var topMostInfo = _viewModel.Windows.FirstOrDefault(w => w.Handle == foregroundWindow);
+                    if (topMostInfo != null) topMostInfo.IsTopMost = _viewModel.WindowService.IsTopMost(foregroundWindow);
                     break;
                 case HotkeyAction.ToggleClickThrough:
                     _viewModel.WindowService.ToggleClickThrough(foregroundWindow);
+                    var clickThroughInfo = _viewModel.Windows.FirstOrDefault(w => w.Handle == foregroundWindow);
+                    if (clickThroughInfo != null) clickThroughInfo.IsClickThrough = _viewModel.WindowService.IsClickThrough(foregroundWindow);
                     break;
                 case HotkeyAction.SetAllTo80:
                     if (DataContext is MainViewModel viewModel)
                     {
-                        foreach (var windowInfo in viewModel.Windows)
+                        viewModel.StatusText = "全ウィンドウの透明度を80%に設定中...";
+                        Task.Run(() =>
                         {
-                            // To prevent changing the main window's opacity
-                            if (windowInfo.Handle != _hwnd)
+                            var windowsToChange = viewModel.Windows.ToList();
+                            foreach (var window in windowsToChange)
                             {
-                                SetTransparency(windowInfo.Handle, 80);
+                                if (window.Handle != _hwnd)
+                                {
+                                    // Set transparency in the background
+                                    _viewModel.WindowService.SetTransparency(window.Handle, 80);
+                                    
+                                    // Update UI on the main thread
+                                    Application.Current.Dispatcher.Invoke(() => window.Opacity = 80);
+                                }
                             }
-                        }
-                        viewModel.StatusText = "すべてのウィンドウの透明度を80%に設定しました。";
+                            Application.Current.Dispatcher.Invoke(() =>
+                            {
+                                viewModel.StatusText = "全ウィンドウの透明度設定が完了しました。";
+                            });
+                        });
                     }
                     break;
             }
@@ -160,7 +175,13 @@ namespace WindowSlu
             this.Height = _settingsService.Settings.WindowHeight;
 
             _hwnd = new WindowInteropHelper(this).EnsureHandle();
-            _hotkeyService = new HotkeyService(_settingsService, _viewModel.WindowService, HandleHotkey);
+            _hotkeyService = new HotkeyService(_hwnd, _settingsService, HandleHotkey);
+            
+            // Add a hook to receive window messages
+            if (PresentationSource.FromVisual(this) is HwndSource source)
+            {
+                source.AddHook(WndProc);
+            }
             
             try
             {
@@ -232,19 +253,20 @@ namespace WindowSlu
         private void MaximizeButton_Click(object sender, RoutedEventArgs e) { WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized; }
         private void CloseButton_Click(object sender, RoutedEventArgs e) { Close(); }
         private void WindowListView_SelectionChanged(object sender, SelectionChangedEventArgs e) { _selectedWindowInfo = (sender as ListView)?.SelectedItem as WindowInfo; }
-        private void PinButton_Click(object sender, RoutedEventArgs e) 
-        { 
-            if (sender is FrameworkElement element && element.DataContext is WindowInfo info) 
+        private void PinButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton && toggleButton.DataContext is WindowInfo info)
             {
-                ToggleTopMost(info.Handle); 
+                _viewModel.WindowService.ToggleTopMost(info.Handle);
+                info.IsTopMost = _viewModel.WindowService.IsTopMost(info.Handle);
             }
         }
         private void ClickThroughButton_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is FrameworkElement element && element.DataContext is WindowInfo info)
+            if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton && toggleButton.DataContext is WindowInfo info)
             {
                 _viewModel.WindowService.ToggleClickThrough(info.Handle);
-                info.IsClickThrough = !info.IsClickThrough;
+                info.IsClickThrough = _viewModel.WindowService.IsClickThrough(info.Handle);
             }
         }
         private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) 
@@ -271,6 +293,18 @@ namespace WindowSlu
         private void LightTheme_Click(object sender, RoutedEventArgs e)
         {
             // ... existing code ...
+        }
+
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            const int WM_HOTKEY = 0x0312;
+            if (msg == WM_HOTKEY)
+            {
+                int hotkeyId = wParam.ToInt32();
+                _hotkeyService?.HandleHotkeyMessage(hotkeyId);
+                handled = true;
+            }
+            return IntPtr.Zero;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

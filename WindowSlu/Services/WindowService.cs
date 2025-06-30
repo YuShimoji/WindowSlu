@@ -5,6 +5,10 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using WindowSlu.Models;
+using System.Windows.Media;
+using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media.Imaging;
 
 namespace WindowSlu.Services
 {
@@ -52,6 +56,24 @@ namespace WindowSlu.Services
         [DllImport("dwmapi.dll")]
         private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out bool pvAttribute, int cbAttribute);
 
+        [DllImport("shell32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr SHGetFileInfo(string pszPath, uint dwFileAttributes, ref SHFILEINFO psfi, uint cbFileInfo, uint uFlags);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool DestroyIcon(IntPtr hIcon);
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+        private struct SHFILEINFO
+        {
+            public IntPtr hIcon;
+            public int iIcon;
+            public uint dwAttributes;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+            public string szDisplayName;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 80)]
+            public string szTypeName;
+        }
+
         private const int GWL_EXSTYLE = -20;
         private const int WS_EX_TOOLWINDOW = 0x00000080;
         private const int DWMWA_CLOAKED = 14;
@@ -63,6 +85,10 @@ namespace WindowSlu.Services
         private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
         private const int WS_EX_LAYERED = 0x00080000;
         private const uint LWA_ALPHA = 0x00000002;
+        private const uint SHGFI_ICON = 0x000000100;
+        private const uint SHGFI_USEFILEATTRIBUTES = 0x000000010;
+        private const uint SHGFI_SMALLICON = 0x000000001;
+        private const uint FILE_ATTRIBUTE_NORMAL = 0x00000080;
 
         private readonly HashSet<string> _processNameBlocklist = new HashSet<string>
         {
@@ -105,9 +131,15 @@ namespace WindowSlu.Services
                 GetWindowText(hWnd, sb, sb.Capacity);
                 
                 string fileDescription;
+                ImageSource? icon = null;
                 try
                 {
+                    string processPath = p.MainModule?.FileName ?? "";
                     fileDescription = p.MainModule?.FileVersionInfo.FileDescription ?? p.ProcessName;
+                    if (!string.IsNullOrEmpty(processPath))
+                    {
+                        icon = GetIconForFile(processPath);
+                    }
                 }
                 catch
                 {
@@ -120,6 +152,7 @@ namespace WindowSlu.Services
                     Title = sb.ToString(),
                     ProcessName = fileDescription,
                     ProcessId = (int)processId,
+                    Icon = icon,
                     Opacity = 100, 
                     IsTopMost = (GetWindowLong(hWnd, -20) & 0x8) != 0, // GWL_EXSTYLE & WS_EX_TOPMOST
                     IsClickThrough = (GetWindowLong(hWnd, -20) & 0x20) != 0 // GWL_EXSTYLE & WS_EX_TRANSPARENT
@@ -198,6 +231,17 @@ namespace WindowSlu.Services
         {
             if (hWnd == IntPtr.Zero) return;
             int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
+
+            // Click-through requires the window to be layered.
+            if ((exStyle & WS_EX_LAYERED) == 0)
+            {
+                // If not layered, apply the style first.
+                SetWindowLong(hWnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
+            }
+            
+            // Re-fetch the style to ensure we have the latest state.
+            exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
+            
             bool isClickThrough = (exStyle & 0x20) != 0; // WS_EX_TRANSPARENT
             int newExStyle;
 
@@ -224,6 +268,28 @@ namespace WindowSlu.Services
         {
             if (hWnd == IntPtr.Zero) return false;
             return (GetWindowLong(hWnd, GWL_EXSTYLE) & 0x20) != 0; // WS_EX_TRANSPARENT
+        }
+
+        private ImageSource? GetIconForFile(string filePath)
+        {
+            SHFILEINFO shinfo = new SHFILEINFO();
+            IntPtr hImgSmall = SHGetFileInfo(filePath, FILE_ATTRIBUTE_NORMAL, ref shinfo, (uint)Marshal.SizeOf(shinfo), SHGFI_ICON | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
+
+            if (shinfo.hIcon == IntPtr.Zero) return null;
+
+            try
+            {
+                var icon = (ImageSource)Imaging.CreateBitmapSourceFromHIcon(
+                    shinfo.hIcon,
+                    Int32Rect.Empty,
+                    BitmapSizeOptions.FromEmptyOptions());
+                icon.Freeze(); // Important for use in a different thread
+                return icon;
+            }
+            finally
+            {
+                DestroyIcon(shinfo.hIcon);
+            }
         }
     }
 } 

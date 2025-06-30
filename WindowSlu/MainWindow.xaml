@@ -63,6 +63,50 @@
             </Style.Triggers>
         </Style>
         
+        <!-- Icon ToggleButton Style -->
+        <Style x:Key="IconToggleButtonStyle" TargetType="ToggleButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Foreground" Value="{DynamicResource ForegroundColor}"/>
+            <Style.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+                    <Setter Property="FontWeight" Value="Bold"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource HighlightColor}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        
+        <!-- Pinned Toggle Button Style -->
+        <Style x:Key="PinToggleButtonStyle" TargetType="ToggleButton" BasedOn="{StaticResource IconToggleButtonStyle}">
+            <Setter Property="Content" Value="📌"/>
+            <Setter Property="FontFamily" Value="Segoe UI Emoji"/>
+            <Setter Property="Foreground" Value="{DynamicResource MutedForegroundColor}"/>
+            <Style.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Click-Through Toggle Button Style -->
+        <Style x:Key="ClickThroughToggleButtonStyle" TargetType="ToggleButton" BasedOn="{StaticResource IconToggleButtonStyle}">
+            <Setter Property="Content" Value="👻"/>
+            <Setter Property="FontFamily" Value="Segoe UI Emoji"/>
+            <Setter Property="Foreground" Value="{DynamicResource MutedForegroundColor}"/>
+            <Style.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        
         <!-- Themed Slider Style -->
         <ControlTemplate x:Key="SliderThumbStyle" TargetType="Thumb">
             <Grid Background="Transparent">
@@ -248,70 +292,45 @@
 
                         <ListView.ItemTemplate>
                             <DataTemplate>
-                                <Grid Margin="0,2">
+                                <Grid Margin="0,5">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="Auto"/> 
+                                        <ColumnDefinition Width="200"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- Pin Button -->
-                                    <Button x:Name="PinButton"
-                                        Grid.Column="0"
-                                        Content="{Binding IsTopMost, Converter={StaticResource BoolToTopMostTextConverter}}"
-                                        Click="PinButton_Click"
-                                        Style="{StaticResource PinButtonStyle}"
-                                        ToolTip="ウィンドウを最前面に固定/解除します"
-                                        Margin="5,0"/>
+                                    <Image Source="{Binding Icon}" Width="16" Height="16" Margin="0,0,10,0" VerticalAlignment="Center" Grid.Column="0"/>
                                     
-                                    <TextBlock Grid.Column="1"
-                                       VerticalAlignment="Center"
-                                       TextTrimming="CharacterEllipsis"
-                                       Margin="5,0"
-                                       Foreground="{DynamicResource ForegroundColor}">
-                                        <TextBlock.Text>
-                                            <Binding Path="Title"/>
-                                        </TextBlock.Text>
-                                        <TextBlock.ToolTip>
-                                            <ToolTip>
-                                                <StackPanel>
-                                                    <TextBlock FontWeight="Bold" Text="{Binding Title}" />
-                                                    <TextBlock Text="{Binding ProcessName}" />
-                                                    <TextBlock Text="{Binding FileDescription}" />
-                                                    <TextBlock Text="{Binding Hwnd, StringFormat='HWND: {0}'}" />
-                                                </StackPanel>
-                                            </ToolTip>
-                                        </TextBlock.ToolTip>
-                                    </TextBlock>
-                                    
-                                    <!-- Opacity Slider -->
-                                    <Grid Grid.Column="2" VerticalAlignment="Center">
-                                        <Slider
-                                            Value="{Binding Opacity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                            IsMoveToPointEnabled="True"
-                                            Minimum="10"
-                                            Maximum="100"
-                                            VerticalAlignment="Center"
-                                            Margin="5,0"
-                                            Style="{StaticResource ThemedSliderStyle}"
-                                            ValueChanged="OpacitySlider_ValueChanged" />
-                                        <TextBlock Text="{Binding Opacity, StringFormat={}{0}%}"
-                                                   IsHitTestVisible="False"
-                                                   VerticalAlignment="Center"
-                                                   HorizontalAlignment="Center"
-                                                   Foreground="{DynamicResource ForegroundColor}"
-                                                   Margin="0,0,0,1"/>
-                                    </Grid>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource ForegroundColor}"/>
+                                        <TextBlock Text="{Binding ProcessName}" FontSize="10" Foreground="{DynamicResource MutedForegroundColor}"/>
+                                    </StackPanel>
 
-                                    <!-- Click-Through Button -->
-                                    <Button Grid.Column="3" 
-                                            Content="&#xE8F1;" 
-                                            FontFamily="Segoe MDL2 Assets" 
-                                            Click="ClickThroughButton_Click" 
-                                            ToolTip="クリックを背後のウィンドウに透過させる"
-                                            Style="{StaticResource PinButtonStyle}"
-                                            Margin="5,0"/>
+                                    <Grid Grid.Column="2" VerticalAlignment="Center">
+                                        <Slider Style="{DynamicResource ThemedSliderStyle}"
+                                                Minimum="0" Maximum="100" 
+                                                Value="{Binding Opacity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                ValueChanged="OpacitySlider_ValueChanged"/>
+                                        <TextBlock Text="{Binding Opacity, StringFormat={}{0}%}" 
+                                                   FontSize="10"
+                                                   IsHitTestVisible="False"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource MutedForegroundColor}"/>
+                                    </Grid>
+                                    
+                                    <ToggleButton Style="{StaticResource PinToggleButtonStyle}" 
+                                                  IsChecked="{Binding IsTopMost, Mode=OneWay}"
+                                                  Grid.Column="3"
+                                                  ToolTip="Toggle Always on Top"
+                                                  Click="PinButton_Click"/>
+
+                                    <ToggleButton Style="{StaticResource ClickThroughToggleButtonStyle}"
+                                                  IsChecked="{Binding IsClickThrough, Mode=OneWay}"
+                                                  Grid.Column="4"
+                                                  ToolTip="Toggle Click-Through"
+                                                  Click="ClickThroughButton_Click"/>
                                 </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>
@@ -360,15 +379,33 @@
                 <TabItem Header="Settings" Style="{DynamicResource ThemedTabItemStyle}">
                     <StackPanel Margin="10">
                         <TextBlock Text="Appearance" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource ForegroundColor}" Margin="0,0,0,10"/>
-                        <Button x:Name="ThemeToggleButton" Content="Toggle Theme" Click="ThemeToggleButton_Click" Width="120" HorizontalAlignment="Left"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,5,0,15">
+                            <Button Content="Light" Click="LightTheme_Click" Style="{StaticResource SettingsButtonStyle}"/>
+                            <Button Content="Dark" Click="DarkTheme_Click" Style="{StaticResource SettingsButtonStyle}"/>
+                        </StackPanel>
                     </StackPanel>
                 </TabItem>
                 <TabItem Header="About" Style="{DynamicResource ThemedTabItemStyle}">
-                    <StackPanel Margin="10">
-                        <TextBlock Text="WindowSlu" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource ForegroundColor}"/>
-                        <TextBlock Text="Version 1.0.0" Foreground="{DynamicResource ForegroundColor}"/>
-                        <TextBlock Text="A simple tool to manage window transparency." Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{DynamicResource ForegroundColor}"/>
-                    </StackPanel>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
+                        <StackPanel>
+                            <TextBlock Text="WindowSluへようこそ" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
+                            <TextBlock Text="このアプリケーションは、ウィンドウの透明度調整や最前面表示を簡単に行うためのツールです。" TextWrapping="Wrap" Margin="0,0,0,15"/>
+
+                            <TextBlock Text="現在利用可能な機能" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                            
+                            <TextBlock Text="■ 透明度の調整" FontWeight="Bold" Margin="0,10,0,5"/>
+                            <TextBlock Text="・リスト内のスライダーを操作して、各ウィンドウの透明度を調整できます。" TextWrapping="Wrap"/>
+                            <TextBlock Text="・ホットキー: Ctrl + Alt + ↑ / ↓" TextWrapping="Wrap"/>
+                            
+                            <TextBlock Text="■ 最前面表示 (ピン留め)" FontWeight="Bold" Margin="0,10,0,5"/>
+                            <TextBlock Text="・リスト右側の 📌 アイコンをクリックすると、そのウィンドウが常に最前面に表示されます。もう一度クリックすると解除されます。" TextWrapping="Wrap"/>
+                            <TextBlock Text="・ホットキー: Ctrl + Alt + T" TextWrapping="Wrap"/>
+
+                            <TextBlock Text="--- 開発中の機能 ---" FontSize="12" Foreground="{DynamicResource MutedForegroundColor}" Margin="0,20,0,5"/>
+                            <TextBlock Text="・クリックスルー (👻)" Foreground="{DynamicResource MutedForegroundColor}" TextWrapping="Wrap"/>
+                            <TextBlock Text="・全ウィンドウの一括操作" Foreground="{DynamicResource MutedForegroundColor}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </ScrollViewer>
                 </TabItem>
             </TabControl>
             

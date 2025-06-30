@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows.Media;
 
 namespace WindowSlu.Models
 {
@@ -11,6 +12,7 @@ namespace WindowSlu.Models
         private int _opacity = 100;
         private bool _isActive;
         private bool _isClickThrough;
+        private ImageSource? _icon;
 
         public IntPtr Handle { get; set; }
         
@@ -45,6 +47,12 @@ namespace WindowSlu.Models
         {
             get => _isClickThrough;
             set => SetField(ref _isClickThrough, value);
+        }
+
+        public ImageSource? Icon
+        {
+            get => _icon;
+            set => SetField(ref _icon, value);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

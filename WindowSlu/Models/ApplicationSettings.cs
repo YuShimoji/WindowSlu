@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using System.Collections.Generic;
 using WindowSlu.Models;
+using System.Windows.Input;
 
 namespace WindowSlu.Models
 {
@@ -16,20 +17,19 @@ namespace WindowSlu.Models
         public double WindowTop { get; set; } = 100;
 
         [JsonPropertyName("window_width")]
-        public double WindowWidth { get; set; } = 800;
+        public double WindowWidth { get; set; } = 525;
 
         [JsonPropertyName("window_height")]
-        public double WindowHeight { get; set; } = 450;
+        public double WindowHeight { get; set; } = 600;
 
         [JsonPropertyName("hotkey_settings")]
         public List<HotkeySetting> HotkeySettings { get; set; } = new List<HotkeySetting>
         {
-            new HotkeySetting("Ctrl+Alt+Up", HotkeyAction.IncreaseOpacity, 10),
-            new HotkeySetting("Ctrl+Alt+Down", HotkeyAction.DecreaseOpacity, 10),
-            new HotkeySetting("Ctrl+Alt+0", HotkeyAction.SetOpacity, 100),
-            new HotkeySetting("Alt+Shift+A", HotkeyAction.SetAllTo80),
-            new HotkeySetting("Ctrl+Alt+T", HotkeyAction.ToggleTopMost),
-            new HotkeySetting("Ctrl+Alt+C", HotkeyAction.ToggleClickThrough)
+            new HotkeySetting { Action = HotkeyAction.IncreaseOpacity,   Key = Key.Up,    Modifiers = ModifierKeys.Control | ModifierKeys.Alt, Parameter = 5,  IsEnabled = true },
+            new HotkeySetting { Action = HotkeyAction.DecreaseOpacity,   Key = Key.Down,  Modifiers = ModifierKeys.Control | ModifierKeys.Alt, Parameter = 5,  IsEnabled = true },
+            new HotkeySetting { Action = HotkeyAction.ToggleTopMost,     Key = Key.T,     Modifiers = ModifierKeys.Control | ModifierKeys.Alt, Parameter = 0,  IsEnabled = true },
+            new HotkeySetting { Action = HotkeyAction.ToggleClickThrough,Key = Key.C,     Modifiers = ModifierKeys.Control | ModifierKeys.Alt, Parameter = 0,  IsEnabled = true },
+            new HotkeySetting { Action = HotkeyAction.SetAllTo80,        Key = Key.A,     Modifiers = ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Shift, Parameter = 80, IsEnabled = true }
         };
     }
 } 

@@ -208,6 +208,7 @@ namespace WindowSlu
             }
             
             await _viewModel.RefreshWindowList();
+            _viewModel.InitializeGroups();
             _viewModel.Start();
         }
 
@@ -253,6 +254,63 @@ namespace WindowSlu
         private void MaximizeButton_Click(object sender, RoutedEventArgs e) { WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized; }
         private void CloseButton_Click(object sender, RoutedEventArgs e) { Close(); }
         private void WindowListView_SelectionChanged(object sender, SelectionChangedEventArgs e) { _selectedWindowInfo = (sender as ListView)?.SelectedItem as WindowInfo; }
+        
+        private void WindowTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            if (e.NewValue is WindowInfo windowInfo)
+            {
+                _selectedWindowInfo = windowInfo;
+                _viewModel.SelectedWindow = windowInfo;
+                _viewModel.SelectedGroup = null;
+            }
+            else if (e.NewValue is WindowGroup group)
+            {
+                _selectedWindowInfo = null;
+                _viewModel.SelectedWindow = null;
+                _viewModel.SelectedGroup = group;
+            }
+        }
+
+        private void CascadeButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && button.Tag is WindowGroup group)
+            {
+                // 現在は簡易実装：グループ内のウィンドウをカスケード配置
+                int offsetX = 30;
+                int offsetY = 30;
+                int startX = 100;
+                int startY = 100;
+
+                // 先頭ウィンドウの位置を基準にする
+                if (group.Windows.Count > 0)
+                {
+                    var leadWindow = group.Windows[0];
+                    startX = leadWindow.Left;
+                    startY = leadWindow.Top;
+                }
+
+                int currentX = startX;
+                int currentY = startY;
+
+                foreach (var window in group.Windows)
+                {
+                    _viewModel.WindowService.SetWindowPosition(
+                        window.Handle, 
+                        currentX, 
+                        currentY, 
+                        window.Width > 0 ? window.Width : 800, 
+                        window.Height > 0 ? window.Height : 600);
+                    
+                    window.Left = currentX;
+                    window.Top = currentY;
+                    
+                    currentX += offsetX;
+                    currentY += offsetY;
+                }
+
+                _viewModel.StatusText = $"Cascaded {group.Windows.Count} windows in '{group.Name}'";
+            }
+        }
         private void PinButton_Click(object sender, RoutedEventArgs e)
         {
             if (sender is System.Windows.Controls.Primitives.ToggleButton toggleButton && toggleButton.DataContext is WindowInfo info)
@@ -292,7 +350,65 @@ namespace WindowSlu
 
         private void LightTheme_Click(object sender, RoutedEventArgs e)
         {
-            // ... existing code ...
+            _currentTheme = Services.Theme.Light;
+            _themeService.ApplyTheme(_currentTheme);
+        }
+
+        private void DarkTheme_Click(object sender, RoutedEventArgs e)
+        {
+            _currentTheme = Services.Theme.Dark;
+            _themeService.ApplyTheme(_currentTheme);
+        }
+
+        // --- Preset Event Handlers ---
+        private void ApplyPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (PresetComboBox.SelectedItem is WindowPreset preset)
+            {
+                // 選択されたグループにプリセットを適用
+                if (_viewModel.SelectedGroup != null)
+                {
+                    _viewModel.PresetService.ApplyPresetToGroup(preset, _viewModel.SelectedGroup);
+                    _viewModel.StatusText = $"Applied preset '{preset.Name}' to group '{_viewModel.SelectedGroup.Name}'";
+                }
+                else if (_selectedWindowInfo != null)
+                {
+                    _viewModel.PresetService.ApplyPresetToWindow(preset, _selectedWindowInfo);
+                    _viewModel.StatusText = $"Applied preset '{preset.Name}' to window";
+                }
+                else
+                {
+                    // 全グループに適用
+                    foreach (var group in _viewModel.WindowGroups)
+                    {
+                        _viewModel.PresetService.ApplyPresetToGroup(preset, group);
+                    }
+                    _viewModel.StatusText = $"Applied preset '{preset.Name}' to all windows";
+                }
+            }
+        }
+
+        private void NewPreset_Click(object sender, RoutedEventArgs e)
+        {
+            var preset = _viewModel.PresetService.CreatePreset($"Preset {_viewModel.PresetService.Presets.Count + 1}");
+            PresetComboBox.SelectedItem = preset;
+            _viewModel.StatusText = $"Created new preset: {preset.Name}";
+        }
+
+        private void DeletePreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (PresetComboBox.SelectedItem is WindowPreset preset)
+            {
+                string name = preset.Name;
+                _viewModel.PresetService.DeletePreset(preset.Id);
+                _viewModel.StatusText = $"Deleted preset: {name}";
+            }
+        }
+
+        private void SavePresets_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.PresetService.SavePresets();
+            _viewModel.StatusText = "Presets saved";
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)

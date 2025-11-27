@@ -46,6 +46,48 @@ namespace WindowSlu.Services
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFOEX lpmi);
+
+        [DllImport("user32.dll")]
+        private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, EnumMonitorsDelegate lpfnEnum, IntPtr dwData);
+
+        private delegate bool EnumMonitorsDelegate(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RECT
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+
+            public int Width => Right - Left;
+            public int Height => Bottom - Top;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+        public struct MONITORINFOEX
+        {
+            public int cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public uint dwFlags;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+            public string szDevice;
+        }
+
+        private const uint MONITOR_DEFAULTTONEAREST = 2;
         
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool GetLayeredWindowAttributes(IntPtr hwnd, out uint crKey, out byte bAlpha, out uint dwFlags);
@@ -291,5 +333,128 @@ namespace WindowSlu.Services
                 DestroyIcon(shinfo.hIcon);
             }
         }
+
+        /// <summary>
+        /// ウィンドウの位置とサイズを取得
+        /// </summary>
+        /// <param name="hWnd">ウィンドウハンドル</param>
+        /// <returns>位置とサイズを含むRECT構造体</returns>
+        public RECT GetWindowPosition(IntPtr hWnd)
+        {
+            RECT rect = new RECT();
+            if (hWnd != IntPtr.Zero)
+            {
+                GetWindowRect(hWnd, out rect);
+            }
+            return rect;
+        }
+
+        /// <summary>
+        /// ウィンドウの位置とサイズを設定
+        /// </summary>
+        /// <param name="hWnd">ウィンドウハンドル</param>
+        /// <param name="x">X座標</param>
+        /// <param name="y">Y座標</param>
+        /// <param name="width">幅</param>
+        /// <param name="height">高さ</param>
+        public void SetWindowPosition(IntPtr hWnd, int x, int y, int width, int height)
+        {
+            if (hWnd == IntPtr.Zero) return;
+            LoggingService.LogInfo($"Setting window {hWnd} position to ({x}, {y}) size ({width}x{height})");
+            
+            if (!MoveWindow(hWnd, x, y, width, height, true))
+            {
+                LoggingService.LogError($"MoveWindow failed for window {hWnd}. Win32Error: {Marshal.GetLastWin32Error()}");
+            }
+        }
+
+        /// <summary>
+        /// ウィンドウのサイズのみを変更（位置は維持）
+        /// </summary>
+        /// <param name="hWnd">ウィンドウハンドル</param>
+        /// <param name="width">新しい幅</param>
+        /// <param name="height">新しい高さ</param>
+        public void SetWindowSize(IntPtr hWnd, int width, int height)
+        {
+            if (hWnd == IntPtr.Zero) return;
+            var rect = GetWindowPosition(hWnd);
+            SetWindowPosition(hWnd, rect.Left, rect.Top, width, height);
+        }
+
+        /// <summary>
+        /// ウィンドウが存在するモニターの識別子を取得
+        /// </summary>
+        /// <param name="hWnd">ウィンドウハンドル</param>
+        /// <returns>モニターのデバイス名</returns>
+        public string GetMonitorId(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero) return string.Empty;
+            
+            IntPtr hMonitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+            MONITORINFOEX monitorInfo = new MONITORINFOEX();
+            monitorInfo.cbSize = Marshal.SizeOf(typeof(MONITORINFOEX));
+            
+            if (GetMonitorInfo(hMonitor, ref monitorInfo))
+            {
+                return monitorInfo.szDevice;
+            }
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// 全モニター情報を取得
+        /// </summary>
+        /// <returns>モニター情報のリスト</returns>
+        public List<MonitorInfo> GetAllMonitors()
+        {
+            var monitors = new List<MonitorInfo>();
+            
+            EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData) =>
+            {
+                MONITORINFOEX monitorInfo = new MONITORINFOEX();
+                monitorInfo.cbSize = Marshal.SizeOf(typeof(MONITORINFOEX));
+                
+                if (GetMonitorInfo(hMonitor, ref monitorInfo))
+                {
+                    monitors.Add(new MonitorInfo
+                    {
+                        DeviceName = monitorInfo.szDevice,
+                        Bounds = monitorInfo.rcMonitor,
+                        WorkArea = monitorInfo.rcWork,
+                        IsPrimary = (monitorInfo.dwFlags & 1) != 0
+                    });
+                }
+                return true;
+            }, IntPtr.Zero);
+            
+            return monitors;
+        }
+
+        /// <summary>
+        /// WindowInfoの位置・サイズ情報を更新
+        /// </summary>
+        /// <param name="windowInfo">更新対象のWindowInfo</param>
+        public void UpdateWindowPositionInfo(WindowInfo windowInfo)
+        {
+            if (windowInfo.Handle == IntPtr.Zero) return;
+            
+            var rect = GetWindowPosition(windowInfo.Handle);
+            windowInfo.Left = rect.Left;
+            windowInfo.Top = rect.Top;
+            windowInfo.Width = rect.Width;
+            windowInfo.Height = rect.Height;
+            windowInfo.MonitorId = GetMonitorId(windowInfo.Handle);
+        }
+    }
+
+    /// <summary>
+    /// モニター情報
+    /// </summary>
+    public class MonitorInfo
+    {
+        public string DeviceName { get; set; } = string.Empty;
+        public WindowService.RECT Bounds { get; set; }
+        public WindowService.RECT WorkArea { get; set; }
+        public bool IsPrimary { get; set; }
     }
 } 

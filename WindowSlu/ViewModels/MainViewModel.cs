@@ -16,6 +16,8 @@ namespace WindowSlu.ViewModels
     {
         private readonly SettingsService _settingsService;
         public WindowService WindowService { get; }
+        public GroupingService GroupingService { get; }
+        public PresetService PresetService { get; }
         private readonly MainWindow _mainWindow;
         private readonly DispatcherTimer _updateTimer;
 
@@ -33,12 +35,50 @@ namespace WindowSlu.ViewModels
             }
         }
 
+        private WindowGroup? _selectedGroup;
+        public WindowGroup? SelectedGroup
+        {
+            get => _selectedGroup;
+            set
+            {
+                if (_selectedGroup != value)
+                {
+                    _selectedGroup = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        private WindowInfo? _selectedWindow;
+        public WindowInfo? SelectedWindow
+        {
+            get => _selectedWindow;
+            set
+            {
+                if (_selectedWindow != value)
+                {
+                    _selectedWindow = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        /// <summary>
+        /// フラットなウィンドウリスト（後方互換性のため維持）
+        /// </summary>
         public ObservableCollection<WindowInfo> Windows { get; } = new ObservableCollection<WindowInfo>();
+
+        /// <summary>
+        /// グループ化されたウィンドウリスト
+        /// </summary>
+        public ObservableCollection<WindowGroup> WindowGroups => GroupingService.Groups;
 
         public MainViewModel(SettingsService settingsService, WindowService windowService, MainWindow mainWindow)
         {
             _settingsService = settingsService;
             WindowService = windowService;
+            GroupingService = new GroupingService();
+            PresetService = new PresetService(windowService, GroupingService);
             _mainWindow = mainWindow;
 
             _updateTimer = new DispatcherTimer
@@ -75,6 +115,7 @@ namespace WindowSlu.ViewModels
                         window.Opacity = WindowService.GetTransparency(window.Handle);
                         window.IsTopMost = WindowService.IsTopMost(window.Handle);
                         window.IsClickThrough = WindowService.IsClickThrough(window.Handle);
+                        WindowService.UpdateWindowPositionInfo(window);
                         Windows.Add(window);
                     }
                     else
@@ -91,6 +132,9 @@ namespace WindowSlu.ViewModels
                         {
                             existing.IsClickThrough = isActuallyClickThrough;
                         }
+                        
+                        // 位置情報を更新
+                        WindowService.UpdateWindowPositionInfo(existing);
                     }
                 }
 
@@ -99,7 +143,20 @@ namespace WindowSlu.ViewModels
                 {
                     Windows.Remove(window);
                 }
+
+                // グループ化を更新
+                GroupingService.UpdateGroups(Windows);
+                OnPropertyChanged(nameof(WindowGroups));
             });
+        }
+
+        /// <summary>
+        /// 初回のグループ化を実行
+        /// </summary>
+        public void InitializeGroups()
+        {
+            GroupingService.GroupByProcess(Windows);
+            OnPropertyChanged(nameof(WindowGroups));
         }
 
         public void UpdateWindowOpacity(int newOpacity)

@@ -13,6 +13,12 @@ namespace WindowSlu.Models
         private bool _isActive;
         private bool _isClickThrough;
         private ImageSource? _icon;
+        private string? _groupId;
+        private int _left;
+        private int _top;
+        private int _width;
+        private int _height;
+        private string _monitorId = string.Empty;
 
         public IntPtr Handle { get; set; }
         
@@ -53,6 +59,60 @@ namespace WindowSlu.Models
         {
             get => _icon;
             set => SetField(ref _icon, value);
+        }
+
+        /// <summary>
+        /// 所属グループID
+        /// </summary>
+        public string? GroupId
+        {
+            get => _groupId;
+            set => SetField(ref _groupId, value);
+        }
+
+        /// <summary>
+        /// ウィンドウのX座標
+        /// </summary>
+        public int Left
+        {
+            get => _left;
+            set => SetField(ref _left, value);
+        }
+
+        /// <summary>
+        /// ウィンドウのY座標
+        /// </summary>
+        public int Top
+        {
+            get => _top;
+            set => SetField(ref _top, value);
+        }
+
+        /// <summary>
+        /// ウィンドウの幅
+        /// </summary>
+        public int Width
+        {
+            get => _width;
+            set => SetField(ref _width, value);
+        }
+
+        /// <summary>
+        /// ウィンドウの高さ
+        /// </summary>
+        public int Height
+        {
+            get => _height;
+            set => SetField(ref _height, value);
+        }
+
+        /// <summary>
+        /// 所属モニター識別子
+        /// </summary>
+        public string MonitorId
+        {
+            get => _monitorId;
+            set => SetField(ref _monitorId, value);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

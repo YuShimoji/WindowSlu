@@ -105,6 +105,7 @@ namespace WindowSlu.ViewModels
         public async Task RefreshWindowList()
         {
             var newWindows = await Task.Run(() => WindowService.GetAllWindows());
+            var foregroundWindow = await Task.Run(() => WindowService.GetForegroundWindow());
             
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
@@ -146,6 +147,12 @@ namespace WindowSlu.ViewModels
                 foreach (var window in windowsToRemove)
                 {
                     Windows.Remove(window);
+                }
+
+                // アクティブウィンドウを設定
+                foreach (var window in Windows)
+                {
+                    window.IsActive = window.Handle == foregroundWindow;
                 }
 
                 // グループ化を更新

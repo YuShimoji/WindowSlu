@@ -298,6 +298,8 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 
                 <Image Source="/Assets/WindowSlu.ico" Width="16" Height="16" Margin="5" Grid.Column="0"/>
@@ -309,16 +311,29 @@
                            HorizontalAlignment="Left"
                            Margin="5,0"/>
 
-                <Button Grid.Column="2" Content="&#xE8A0;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource TitleBarButtonStyle}" Click="TrayButton_Click" ToolTip="Minimize to Tray"/>
-                <Button Grid.Column="3" Content="&#xE921;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click"/>
-                <Button Grid.Column="4" Content="&#xE739;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource TitleBarButtonStyle}" Click="MaximizeButton_Click"/>
-                <Button Grid.Column="5" Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource TitleBarButtonStyle}" Click="CloseButton_Click"/>
+                <Button Grid.Column="2" Content="&#xE793;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource TitleBarButtonStyle}" Click="ThemeToggleButton_Click" ToolTip="Toggle Theme"/>
+                <Button Grid.Column="3" Content="&#xE8A0;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource TitleBarButtonStyle}" Click="TrayButton_Click" ToolTip="Minimize to Tray"/>
+                <Button Grid.Column="4" Content="&#xE921;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource TitleBarButtonStyle}" Click="MinimizeButton_Click"/>
+                <Button Grid.Column="5" Content="&#xE739;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource TitleBarButtonStyle}" Click="MaximizeButton_Click"/>
+                <Button Grid.Column="6" Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource TitleBarButtonStyle}" Click="CloseButton_Click"/>
             </Grid>
             
             <!-- Main Content -->
             <TabControl Grid.Row="1" Style="{DynamicResource ThemedTabControlStyle}">
                 <TabItem Header="Windows" Style="{DynamicResource ThemedTabItemStyle}">
-                    <TreeView 
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- コントロールバー -->
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10,10,10,5">
+                            <Button Content="Set All to 80%" Click="SetAllTo80Percent_Click" Style="{StaticResource SettingsButtonStyle}" Width="120"/>
+                            <Button Content="Set All to 100%" Click="SetAllTo100Percent_Click" Style="{StaticResource SettingsButtonStyle}" Width="120" Margin="10,0,0,0"/>
+                        </StackPanel>
+
+                        <TreeView Grid.Row="1" 
                       x:Name="WindowTreeView"
                       ItemsSource="{Binding WindowGroups}"
                       Background="Transparent"
@@ -365,6 +380,19 @@
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
+
+                                    <Border x:Name="ActiveBorder" Background="{DynamicResource AccentHighlightColor}" Opacity="0.3" CornerRadius="3" Margin="-2">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                    </Border>
 
                                     <Image Source="{Binding Icon}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" Grid.Column="0"/>
                                     

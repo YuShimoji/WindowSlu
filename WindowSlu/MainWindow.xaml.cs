@@ -518,6 +518,27 @@ namespace WindowSlu
             _viewModel.StatusText = "Hotkeys reset to defaults";
         }
 
+        // --- Bulk Window Operations ---
+        private void SetAllTo80Percent_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (var window in _viewModel.Windows)
+            {
+                _viewModel.WindowService.SetTransparency(window.Handle, 80);
+                window.Opacity = 80;
+            }
+            _viewModel.StatusText = "Set all windows to 80% opacity";
+        }
+
+        private void SetAllTo100Percent_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (var window in _viewModel.Windows)
+            {
+                _viewModel.WindowService.SetTransparency(window.Handle, 100);
+                window.Opacity = 100;
+            }
+            _viewModel.StatusText = "Set all windows to 100% opacity";
+        }
+
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
             const int WM_HOTKEY = 0x0312;

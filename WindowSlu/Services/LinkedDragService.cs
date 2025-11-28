@@ -41,7 +41,6 @@ namespace WindowSlu.Services
         {
             _groupingService = groupingService ?? throw new ArgumentNullException(nameof(groupingService));
             _windowService = windowService ?? throw new ArgumentNullException(nameof(windowService));
-
             _debounceTimer = new Timer(ProcessPendingMoves, null, Timeout.Infinite, Timeout.Infinite);
 
             // WinEventHook のセットアップ

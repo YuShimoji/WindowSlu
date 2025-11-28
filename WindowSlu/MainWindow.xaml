@@ -487,7 +487,8 @@
                             </Style>
                         </TreeView.ItemContainerStyle>
                     </TreeView>
-                </TabItem>
+                </Grid>
+            </TabItem>
                 <TabItem Header="Presets" Style="{DynamicResource ThemedTabItemStyle}">
                     <Grid Margin="10">
                         <Grid.RowDefinitions>

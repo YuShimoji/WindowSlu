@@ -18,6 +18,7 @@ namespace WindowSlu.ViewModels
         public WindowService WindowService { get; }
         public GroupingService GroupingService { get; }
         public PresetService PresetService { get; }
+        public LinkedDragService LinkedDragService { get; }
         private readonly MainWindow _mainWindow;
         private readonly DispatcherTimer _updateTimer;
 
@@ -79,6 +80,7 @@ namespace WindowSlu.ViewModels
             WindowService = windowService;
             GroupingService = new GroupingService();
             PresetService = new PresetService(windowService, GroupingService);
+            LinkedDragService = new LinkedDragService(GroupingService, windowService);
             _mainWindow = mainWindow;
 
             _updateTimer = new DispatcherTimer
@@ -96,6 +98,7 @@ namespace WindowSlu.ViewModels
         public void Stop()
         {
             _updateTimer.Stop();
+            LinkedDragService?.Dispose();
         }
 
         public async Task RefreshWindowList()

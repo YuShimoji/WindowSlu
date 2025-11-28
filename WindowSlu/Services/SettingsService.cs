@@ -11,7 +11,7 @@ namespace WindowSlu.Services
     public class SettingsService
     {
         private readonly string _settingsFilePath;
-        public ApplicationSettings Settings { get; private set; }
+        public ApplicationSettings Settings { get; private set; } = null!;
 
         public SettingsService()
         {

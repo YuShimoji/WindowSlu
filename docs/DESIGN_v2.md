@@ -349,30 +349,35 @@ public class LinkedDragService
 
 ## 7. 実装フェーズ
 
-### Phase 1: グループ化機能
-- [ ] `WindowGroup`モデル作成
-- [ ] `GroupingService`実装
-- [ ] TreeView UIへの変更
-- [ ] グループ展開/折りたたみ機能
+### Phase 1: グループ化機能 ✅
 
-### Phase 2: プリセット機能
-- [ ] `WindowPreset`モデル作成
-- [ ] `PresetService`実装（保存・読込）
-- [ ] プリセットUI（選択・適用）
-- [ ] 現在状態からのプリセット作成
+- [x] `WindowGroup`モデル作成
+- [x] `GroupingService`実装
+- [x] TreeView UIへの変更
+- [x] グループ展開/折りたたみ機能
 
-### Phase 3: ウィンドウリサイズ・位置機能
-- [ ] `WindowService`拡張（GetWindowRect/SetWindowRect）
-- [ ] `WindowInfo`拡張（座標・サイズプロパティ）
-- [ ] マルチモニター情報取得
+### Phase 2: プリセット機能 ✅
 
-### Phase 4: カスケード配置
-- [ ] `CascadeSettings`モデル作成
-- [ ] `ArrangementService`実装
-- [ ] カスケード方向選択UI
-- [ ] オフセット設定UI
+- [x] `WindowPreset`モデル作成
+- [x] `PresetService`実装（保存・読込）
+- [x] プリセットUI（選択・適用）
+- [x] 現在状態からのプリセット作成
 
-### Phase 5: 連動ドラッグ
+### Phase 3: ウィンドウリサイズ・位置機能 ✅
+
+- [x] `WindowService`拡張（GetWindowRect/SetWindowRect）
+- [x] `WindowInfo`拡張（座標・サイズプロパティ）
+- [x] マルチモニター情報取得
+
+### Phase 4: カスケード配置 ✅
+
+- [x] `CascadeSettings`モデル作成（WindowPresetに統合）
+- [x] カスケード配置ロジック実装（PresetServiceに統合）
+- [x] カスケード方向選択UI
+- [x] オフセット設定UI
+
+### Phase 5: 連動ドラッグ ⏳
+
 - [ ] `LinkedDragService`実装
 - [ ] WinEventHook統合
 - [ ] 連動ドラッグ開始/終了UI
@@ -391,5 +396,5 @@ public class LinkedDragService
 
 ---
 
-*Document Version: 1.0*
-*Last Updated: 2024-XX-XX*
+*Document Version: 1.1*
+*Last Updated: 2024-11-28*

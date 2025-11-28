@@ -212,7 +212,7 @@ namespace WindowSlu
             _viewModel.Start();
         }
 
-        private void MainWindow_Closed(object sender, EventArgs e)
+        private void MainWindow_Closed(object? sender, EventArgs e)
         {
             LoggingService.LogInfo("Main window closing. Disposing resources.");
             _hotkeyService?.Dispose();

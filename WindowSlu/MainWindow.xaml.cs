@@ -411,6 +411,113 @@ namespace WindowSlu
             _viewModel.StatusText = "Presets saved";
         }
 
+        // --- Hotkey Event Handlers ---
+        private void EditHotkey_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && button.Tag is HotkeySetting setting)
+            {
+                // シンプルな編集ダイアログ
+                var dialog = new Window
+                {
+                    Title = $"Edit Hotkey for {setting.Action}",
+                    Width = 300,
+                    Height = 200,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Owner = this,
+                    Background = Background,
+                    Foreground = Foreground
+                };
+
+                var stackPanel = new StackPanel { Margin = new Thickness(10) };
+                var instructionText = new TextBlock
+                {
+                    Text = "Press the key combination you want to assign:",
+                    Margin = new Thickness(0, 0, 0, 10)
+                };
+                stackPanel.Children.Add(instructionText);
+
+                var keyTextBox = new TextBox
+                {
+                    IsReadOnly = true,
+                    Text = setting.Keys,
+                    Margin = new Thickness(0, 0, 0, 10)
+                };
+                stackPanel.Children.Add(keyTextBox);
+
+                var buttonPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+                var okButton = new Button { Content = "OK", Width = 60, Margin = new Thickness(5, 0, 0, 0) };
+                var cancelButton = new Button { Content = "Cancel", Width = 60, Margin = new Thickness(5, 0, 0, 0) };
+                buttonPanel.Children.Add(okButton);
+                buttonPanel.Children.Add(cancelButton);
+                stackPanel.Children.Add(buttonPanel);
+
+                dialog.Content = stackPanel;
+
+                KeyEventHandler keyDownHandler = null!;
+                keyDownHandler = (s, args) =>
+                {
+                    var modifiers = Keyboard.Modifiers;
+                    var key = args.Key;
+                    if (key == Key.System) key = args.SystemKey; // Alt+Tab etc.
+
+                    // 修飾キーなしのキーだけを無視
+                    if (modifiers == ModifierKeys.None && (key == Key.LeftShift || key == Key.RightShift ||
+                        key == Key.LeftCtrl || key == Key.RightCtrl || key == Key.LeftAlt || key == Key.RightAlt))
+                        return;
+
+                    var keyString = "";
+                    if ((modifiers & ModifierKeys.Control) != 0) keyString += "Ctrl+";
+                    if ((modifiers & ModifierKeys.Alt) != 0) keyString += "Alt+";
+                    if ((modifiers & ModifierKeys.Shift) != 0) keyString += "Shift+";
+                    keyString += key.ToString();
+
+                    keyTextBox.Text = keyString;
+                    setting.Keys = keyString;
+                    setting.Modifiers = modifiers;
+                    setting.Key = key;
+                };
+
+                keyTextBox.KeyDown += keyDownHandler;
+
+                okButton.Click += (s, args) =>
+                {
+                    dialog.Close();
+                };
+
+                cancelButton.Click += (s, args) =>
+                {
+                    dialog.Close();
+                };
+
+                dialog.ShowDialog();
+
+                keyTextBox.KeyDown -= keyDownHandler;
+            }
+        }
+
+        private void SaveHotkeys_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.SettingsService.SaveSettings();
+            _hotkeyService?.ReloadSettings();
+            _viewModel.StatusText = "Hotkeys saved";
+        }
+
+        private void ResetHotkeys_Click(object sender, RoutedEventArgs e)
+        {
+            // デフォルトホットキーを設定
+            var defaultHotkeys = new List<HotkeySetting>
+            {
+                new HotkeySetting("Ctrl+Alt+Up", HotkeyAction.IncreaseOpacity, 10),
+                new HotkeySetting("Ctrl+Alt+Down", HotkeyAction.DecreaseOpacity, 10),
+                new HotkeySetting("Ctrl+Alt+T", HotkeyAction.ToggleTopMost),
+                new HotkeySetting("Ctrl+Alt+Shift+A", HotkeyAction.SetAllTo80, 80)
+            };
+
+            _viewModel.SettingsService.Settings.HotkeySettings = defaultHotkeys;
+            HotkeySettingsList.ItemsSource = defaultHotkeys; // UI更新
+            _viewModel.StatusText = "Hotkeys reset to defaults";
+        }
+
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
             const int WM_HOTKEY = 0x0312;

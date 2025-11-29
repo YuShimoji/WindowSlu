@@ -27,8 +27,10 @@ namespace WindowSlu
         private readonly ThemeService _themeService;
         private readonly SettingsService _settingsService;
         private HotkeyService? _hotkeyService;
+        private GlobalMouseHookService? _globalMouseHookService;
         private Services.Theme _currentTheme = Services.Theme.Dark;
         private IntPtr _hwnd;
+
         private Hardcodet.Wpf.TaskbarNotification.TaskbarIcon? MyNotifyIcon;
         private ContextMenu? _contextMenu;
         private MenuItem? _showMenuItem;
@@ -47,6 +49,70 @@ namespace WindowSlu
             _settingsService = new SettingsService();
             _viewModel = new MainViewModel(_settingsService, windowService, this);
             this.DataContext = _viewModel;
+
+            // グローバルマウスフック（Ctrl+ホイールで透明度調整）を初期化
+            try
+            {
+                _globalMouseHookService = new GlobalMouseHookService();
+                _globalMouseHookService.GlobalMouseWheelEvent += (sender, e) =>
+                {
+                    try
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            if (e.WindowHandle == IntPtr.Zero)
+                            {
+                                return;
+                            }
+
+                            // メインウィンドウ自体は対象外
+                            if (e.WindowHandle == _hwnd)
+                            {
+                                return;
+                            }
+
+                            // 管理対象のウィンドウか確認
+                            var windowInfo = _viewModel.Windows.FirstOrDefault(w => w.Handle == e.WindowHandle);
+                            if (windowInfo == null)
+                            {
+                                return;
+                            }
+
+                            int currentOpacity = windowInfo.Opacity;
+                            if (currentOpacity < 0 || currentOpacity > 100)
+                            {
+                                currentOpacity = _viewModel.WindowService.GetTransparency(e.WindowHandle);
+                            }
+
+                            const int step = 10;
+                            int direction = e.Delta > 0 ? 1 : -1;
+                            int newOpacity = Math.Max(0, Math.Min(100, currentOpacity + direction * step));
+
+                            if (newOpacity == currentOpacity)
+                            {
+                                return;
+                            }
+
+                            _viewModel.WindowService.SetTransparency(e.WindowHandle, newOpacity);
+                            windowInfo.Opacity = newOpacity;
+                            ShowTransparencyIndicator(newOpacity);
+                            _viewModel.StatusText = $"Adjusted opacity of '{windowInfo.Title}' to {newOpacity}% via Ctrl+MouseWheel";
+
+                            // 他アプリのズームなど既定動作を抑制
+                            e.Handled = true;
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        LoggingService.LogError($"Error handling global mouse wheel event: {ex.Message}");
+                    }
+                };
+                LoggingService.LogInfo("GlobalMouseHookService initialized successfully.");
+            }
+            catch (Exception ex)
+            {
+                LoggingService.LogError($"Failed to initialize GlobalMouseHookService: {ex.Message}");
+            }
 
             // Apply saved theme
             if (Enum.TryParse<Services.Theme>(_settingsService.Settings.Theme, out var savedTheme))
@@ -217,6 +283,7 @@ namespace WindowSlu
         {
             LoggingService.LogInfo("Main window closing. Disposing resources.");
             _hotkeyService?.Dispose();
+            _globalMouseHookService?.Dispose();
 
             // Save window position and size
             _settingsService.Settings.WindowLeft = this.Left;

@@ -19,6 +19,7 @@ namespace WindowSlu.Models
         private int _width;
         private int _height;
         private string _monitorId = string.Empty;
+        private bool _includeInLinkedDrag = true;
 
         public IntPtr Handle { get; set; }
         
@@ -113,6 +114,15 @@ namespace WindowSlu.Models
         {
             get => _monitorId;
             set => SetField(ref _monitorId, value);
+        }
+
+        /// <summary>
+        /// 連動ドラッグに含めるかどうか
+        /// </summary>
+        public bool IncludeInLinkedDrag
+        {
+            get => _includeInLinkedDrag;
+            set => SetField(ref _includeInLinkedDrag, value);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

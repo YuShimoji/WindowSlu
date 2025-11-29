@@ -24,6 +24,9 @@ namespace WindowSlu.Services
         private readonly Timer _debounceTimer;
         private readonly Dictionary<IntPtr, (Point Delta, IntPtr LeaderHandle)> _pendingMoves = new Dictionary<IntPtr, (Point, IntPtr)>();
         private const int DEBOUNCE_DELAY_MS = 100; // デバウンス遅延（ミリ秒）
+        private volatile bool _isProcessingMoves;
+        private readonly Dictionary<IntPtr, DateTime> _suppressedUntil = new Dictionary<IntPtr, DateTime>();
+        private const int SUPPRESS_AFTER_MOVE_MS = 200;
 
         // WinEventHook P/Invoke
         [DllImport("user32.dll")]
@@ -47,10 +50,24 @@ namespace WindowSlu.Services
             // WinEvent のコールバックデリゲートをフィールドに保持して GC されないようにする
             _winEventDelegate = WinEventProc;
 
-            // 連動ドラッグ機能は現在無効化（無限ループ問題の修正が必要）
-            // TODO: ユーザーがドラッグ中かどうかを判定し、自分が移動させたウィンドウからのイベントを無視するロジックを追加する
-            _eventHook = IntPtr.Zero;
-            LoggingService.LogInfo("LinkedDragService: WinEventHook is currently disabled.");
+            // WinEventHook を有効化（全プロセス対象、位置変更イベントのみ）
+            _eventHook = SetWinEventHook(
+                EVENT_OBJECT_LOCATIONCHANGE,
+                EVENT_OBJECT_LOCATIONCHANGE,
+                IntPtr.Zero,
+                _winEventDelegate,
+                0,
+                0,
+                WINEVENT_OUTOFCONTEXT);
+
+            if (_eventHook == IntPtr.Zero)
+            {
+                LoggingService.LogError("LinkedDragService: Failed to set WinEventHook for linked drag.");
+            }
+            else
+            {
+                LoggingService.LogInfo("LinkedDragService: WinEventHook registered successfully for linked drag.");
+            }
         }
 
         private void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
@@ -70,6 +87,12 @@ namespace WindowSlu.Services
 
         private void HandleWindowMove(IntPtr hwnd)
         {
+            // 自前の MoveWindow/SetWindowPosition 呼び出し中に発生したイベントは無視する
+            if (_isProcessingMoves)
+            {
+                return;
+            }
+
             // ウィンドウの現在の位置を取得
             var rect = _windowService.GetWindowPosition(hwnd);
             if (rect.Width == 0 && rect.Height == 0) return; // 無効な位置
@@ -78,6 +101,16 @@ namespace WindowSlu.Services
 
             lock (_lock)
             {
+                if (_suppressedUntil.TryGetValue(hwnd, out var until))
+                {
+                    if (DateTime.UtcNow <= until)
+                    {
+                        return;
+                    }
+
+                    _suppressedUntil.Remove(hwnd);
+                }
+
                 // 前回の位置を取得
                 if (_lastPositions.TryGetValue(hwnd, out var lastPos))
                 {
@@ -88,16 +121,34 @@ namespace WindowSlu.Services
                     {
                         // グループを取得
                         var group = _groupingService.Groups.FirstOrDefault(g => g.Windows.Any(w => w.Handle == hwnd));
-                        if (group != null && group.Windows.Count > 1)
+                        // グループの連動ドラッグが無効な場合はスキップ
+                        if (group != null && group.Windows.Count > 1 && group.LinkedDragEnabled)
                         {
-                            // グループ内他のウィンドウを移動
-                            foreach (var window in group.Windows.Where(w => w.Handle != hwnd))
+                            // ドラッグ元ウィンドウの IncludeInLinkedDrag を確認
+                            var leaderWindow = group.Windows.FirstOrDefault(w => w.Handle == hwnd);
+                            if (leaderWindow == null || !leaderWindow.IncludeInLinkedDrag)
+                            {
+                                // ドラッグ元が連動対象外なら他のウィンドウは追従しない
+                                _lastPositions[hwnd] = currentPos;
+                                return;
+                            }
+
+                            // グループ内他のウィンドウを移動（連動対象のみ）
+                            foreach (var window in group.Windows.Where(w => w.Handle != hwnd && w.IncludeInLinkedDrag))
                             {
                                 var windowRect = _windowService.GetWindowPosition(window.Handle);
                                 if (windowRect.Width > 0 && windowRect.Height > 0)
                                 {
-                                    // 保留中の移動を更新
-                                    _pendingMoves[window.Handle] = (delta, hwnd);
+                                    // 保留中の移動を蓄積（上書きではなく加算）
+                                    if (_pendingMoves.TryGetValue(window.Handle, out var existing))
+                                    {
+                                        var accumulatedDelta = new Point(existing.Delta.X + delta.X, existing.Delta.Y + delta.Y);
+                                        _pendingMoves[window.Handle] = (accumulatedDelta, hwnd);
+                                    }
+                                    else
+                                    {
+                                        _pendingMoves[window.Handle] = (delta, hwnd);
+                                    }
                                 }
                             }
 
@@ -114,25 +165,60 @@ namespace WindowSlu.Services
 
         private void ProcessPendingMoves(object? state)
         {
-            lock (_lock)
+            _isProcessingMoves = true;
+            try
             {
-                foreach (var kvp in _pendingMoves)
+                lock (_lock)
                 {
-                    var windowHandle = kvp.Key;
-                    var (delta, leaderHandle) = kvp.Value;
-
-                    var rect = _windowService.GetWindowPosition(windowHandle);
-                    if (rect.Width > 0 && rect.Height > 0)
+                    foreach (var kvp in _pendingMoves)
                     {
-                        var newX = rect.Left + (int)delta.X;
-                        var newY = rect.Top + (int)delta.Y;
+                        var windowHandle = kvp.Key;
+                        var (delta, leaderHandle) = kvp.Value;
 
-                        // ウィンドウを移動（サイズは維持）
-                        _windowService.SetWindowPosition(windowHandle, newX, newY, rect.Width, rect.Height);
+                        // 移動量が極端に大きい場合はスキップ（異常値の防止）
+                        if (Math.Abs(delta.X) > 500 || Math.Abs(delta.Y) > 500)
+                        {
+                            LoggingService.LogInfo($"LinkedDragService: Skipping abnormally large delta ({delta.X}, {delta.Y}) for window {windowHandle}");
+                            continue;
+                        }
+
+                        var rect = _windowService.GetWindowPosition(windowHandle);
+                        if (rect.Width > 0 && rect.Height > 0)
+                        {
+                            var newX = rect.Left + (int)delta.X;
+                            var newY = rect.Top + (int)delta.Y;
+
+                            // ウィンドウを移動（サイズは維持）
+                            _windowService.SetWindowPosition(windowHandle, newX, newY, rect.Width, rect.Height);
+
+                            _lastPositions[windowHandle] = new Point(newX, newY);
+                            _suppressedUntil[windowHandle] = DateTime.UtcNow.AddMilliseconds(SUPPRESS_AFTER_MOVE_MS);
+
+                            // 対応する WindowInfo も更新（UIに反映するため）
+                            var windowInfo = _groupingService.Groups
+                                .SelectMany(g => g.Windows)
+                                .FirstOrDefault(w => w.Handle == windowHandle);
+                            if (windowInfo != null)
+                            {
+                                windowInfo.Left = newX;
+                                windowInfo.Top = newY;
+                                // Width/Height は rect から取得した値を使用
+                                windowInfo.Width = rect.Width;
+                                windowInfo.Height = rect.Height;
+                            }
+                        }
+                        else
+                        {
+                            LoggingService.LogInfo($"LinkedDragService: Skipping window {windowHandle} with invalid size ({rect.Width}x{rect.Height})");
+                        }
                     }
-                }
 
-                _pendingMoves.Clear();
+                    _pendingMoves.Clear();
+                }
+            }
+            finally
+            {
+                _isProcessingMoves = false;
             }
         }
 

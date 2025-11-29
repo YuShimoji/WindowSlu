@@ -14,10 +14,12 @@
     <SolidColorBrush x:Key="TabBackgroundColor" Color="#E1E1E1"/>
     <SolidColorBrush x:Key="TabSelectedColor" Color="White"/>
     <SolidColorBrush x:Key="TabSelectedTextColor" Color="Black"/>
+    <SolidColorBrush x:Key="AccentColor" Color="#0078D7"/>
+    <SolidColorBrush x:Key="MutedForegroundColor" Color="#666666"/>
+    <SolidColorBrush x:Key="ListItemHoverColor" Color="#EAEAEA"/>
 
     <!-- ScrollBar Colors -->
     <SolidColorBrush x:Key="ScrollBarBackgroundColor" Color="#F0F0F0"/>
     <SolidColorBrush x:Key="ScrollBarThumbColor" Color="#C0C0C0"/>
 
 </ResourceDictionary>
- 

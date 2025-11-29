@@ -18,6 +18,7 @@ namespace WindowSlu.Models
         private bool _isExpanded = true;
         private ImageSource? _groupIcon;
         private bool _isSelected;
+        private bool _linkedDragEnabled = true;
 
         /// <summary>
         /// グループの一意識別子 (GUID)
@@ -85,6 +86,15 @@ namespace WindowSlu.Models
         {
             get => _isSelected;
             set => SetField(ref _isSelected, value);
+        }
+
+        /// <summary>
+        /// このグループで連動ドラッグを有効にするかどうか
+        /// </summary>
+        public bool LinkedDragEnabled
+        {
+            get => _linkedDragEnabled;
+            set => SetField(ref _linkedDragEnabled, value);
         }
 
         /// <summary>

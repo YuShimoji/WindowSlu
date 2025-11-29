@@ -28,6 +28,9 @@ namespace WindowSlu.Models
         [JsonPropertyName("hotkeys_enabled")]
         public bool HotkeysEnabled { get; set; } = false;
 
+        [JsonPropertyName("linked_drag_enabled")]
+        public bool LinkedDragEnabled { get; set; } = true;
+
         [JsonPropertyName("hotkey_settings")]
         public List<HotkeySetting> HotkeySettings { get; set; } = new List<HotkeySetting>
         {

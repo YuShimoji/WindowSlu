@@ -168,14 +168,15 @@ namespace WindowSlu
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             LoggingService.LogInfo("MainWindow_Loaded event triggered.");
-            // Restore window position and size
-            this.Left = _settingsService.Settings.WindowLeft;
-            this.Top = _settingsService.Settings.WindowTop;
-            this.Width = _settingsService.Settings.WindowWidth;
-            this.Height = _settingsService.Settings.WindowHeight;
+            
+            // Restore window position and size with validation
+            RestoreWindowPosition();
 
             _hwnd = new WindowInteropHelper(this).EnsureHandle();
-            _hotkeyService = new HotkeyService(_hwnd, _settingsService, HandleHotkey);
+            if (_settingsService.Settings.HotkeysEnabled)
+            {
+                _hotkeyService = new HotkeyService(_hwnd, _settingsService, HandleHotkey);
+            }
             
             // Add a hook to receive window messages
             if (PresentationSource.FromVisual(this) is HwndSource source)
@@ -246,6 +247,67 @@ namespace WindowSlu
             _viewModel.WindowService.ToggleTopMost(hWnd);
             var windowInfo = _viewModel.Windows.FirstOrDefault(w => w.Handle == hWnd);
             if (windowInfo != null) windowInfo.IsTopMost = !windowInfo.IsTopMost;
+        }
+
+        /// <summary>
+        /// ウィンドウ位置を復元し、画面外の場合は中央に配置する
+        /// </summary>
+        private void RestoreWindowPosition()
+        {
+            double left = _settingsService.Settings.WindowLeft;
+            double top = _settingsService.Settings.WindowTop;
+            double width = _settingsService.Settings.WindowWidth;
+            double height = _settingsService.Settings.WindowHeight;
+
+            // サイズの検証（最小サイズを確保）
+            if (width < 400) width = 800;
+            if (height < 300) height = 450;
+
+            // 画面の作業領域を取得
+            var workArea = SystemParameters.WorkArea;
+
+            // 位置の検証（画面内に収まるか確認）
+            bool isPositionValid = 
+                left >= workArea.Left - 100 && 
+                left < workArea.Right - 100 &&
+                top >= workArea.Top - 50 && 
+                top < workArea.Bottom - 100;
+
+            if (!isPositionValid)
+            {
+                // 画面外の場合は中央に配置
+                left = (workArea.Width - width) / 2 + workArea.Left;
+                top = (workArea.Height - height) / 2 + workArea.Top;
+                LoggingService.LogInfo($"Window position was off-screen. Resetting to center: ({left}, {top})");
+            }
+
+            this.Left = left;
+            this.Top = top;
+            this.Width = width;
+            this.Height = height;
+
+            LoggingService.LogInfo($"Window position restored: Left={left}, Top={top}, Width={width}, Height={height}");
+        }
+
+        private IEnumerable<WindowInfo> GetBulkTargetWindows()
+        {
+            if (_viewModel.SelectedGroup != null)
+            {
+                return _viewModel.SelectedGroup.Windows;
+            }
+
+            if (_selectedWindowInfo != null)
+            {
+                var group = _viewModel.WindowGroups.FirstOrDefault(g => g.Windows.Contains(_selectedWindowInfo));
+                if (group != null)
+                {
+                    return group.Windows;
+                }
+
+                return new[] { _selectedWindowInfo };
+            }
+
+            return _viewModel.Windows;
         }
 
         // --- Event Handlers ---
@@ -335,6 +397,28 @@ namespace WindowSlu
                 SetTransparency(info.Handle, (int)e.NewValue); 
             }
         }
+        private void WindowWidthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (sender is Slider slider && slider.DataContext is WindowInfo info)
+            {
+                int newWidth = (int)e.NewValue;
+                int height = info.Height > 0 ? info.Height : 600;
+                _viewModel.WindowService.SetWindowSize(info.Handle, newWidth, height);
+                info.Width = newWidth;
+            }
+        }
+
+        private void WindowHeightSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (sender is Slider slider && slider.DataContext is WindowInfo info)
+            {
+                int newHeight = (int)e.NewValue;
+                int width = info.Width > 0 ? info.Width : 800;
+                _viewModel.WindowService.SetWindowSize(info.Handle, width, newHeight);
+                info.Height = newHeight;
+            }
+        }
+
         private void ThemeToggleButton_Click(object sender, RoutedEventArgs e) 
         {
             _currentTheme = _currentTheme == Services.Theme.Dark ? Services.Theme.Light : Services.Theme.Dark; 
@@ -460,10 +544,20 @@ namespace WindowSlu
                     var key = args.Key;
                     if (key == Key.System) key = args.SystemKey; // Alt+Tab etc.
 
-                    // 修飾キーなしのキーだけを無視
-                    if (modifiers == ModifierKeys.None && (key == Key.LeftShift || key == Key.RightShift ||
-                        key == Key.LeftCtrl || key == Key.RightCtrl || key == Key.LeftAlt || key == Key.RightAlt))
+                    // 修飾キー単体は無視
+                    if (key == Key.LeftShift || key == Key.RightShift ||
+                        key == Key.LeftCtrl || key == Key.RightCtrl ||
+                        key == Key.LeftAlt || key == Key.RightAlt)
+                    {
                         return;
+                    }
+
+                    // 修飾キーなしのホットキーは無効化（a など単独キーで OS 全体をブロックしないため）
+                    if (modifiers == ModifierKeys.None)
+                    {
+                        _viewModel.StatusText = "Hotkeys must include Ctrl, Alt, or Shift.";
+                        return;
+                    }
 
                     var keyString = "";
                     if ((modifiers & ModifierKeys.Control) != 0) keyString += "Ctrl+";
@@ -497,9 +591,29 @@ namespace WindowSlu
 
         private void SaveHotkeys_Click(object sender, RoutedEventArgs e)
         {
+            // 設定を保存
             _viewModel.SettingsService.SaveSettings();
-            _hotkeyService?.ReloadSettings();
-            _viewModel.StatusText = "Hotkeys saved";
+
+            // フラグに応じてホットキーを有効化 / 無効化
+            if (_viewModel.SettingsService.Settings.HotkeysEnabled)
+            {
+                if (_hotkeyService == null)
+                {
+                    _hotkeyService = new HotkeyService(_hwnd, _settingsService, HandleHotkey);
+                }
+                else
+                {
+                    _hotkeyService.ReloadSettings();
+                }
+
+                _viewModel.StatusText = "Hotkeys enabled and saved";
+            }
+            else
+            {
+                _hotkeyService?.Dispose();
+                _hotkeyService = null;
+                _viewModel.StatusText = "Hotkeys disabled and saved";
+            }
         }
 
         private void ResetHotkeys_Click(object sender, RoutedEventArgs e)
@@ -521,22 +635,49 @@ namespace WindowSlu
         // --- Bulk Window Operations ---
         private void SetAllTo80Percent_Click(object sender, RoutedEventArgs e)
         {
-            foreach (var window in _viewModel.Windows)
+            var targets = GetBulkTargetWindows().ToList();
+            var percent = _viewModel.BulkOpacityPercent;
+            foreach (var window in targets)
             {
-                _viewModel.WindowService.SetTransparency(window.Handle, 80);
-                window.Opacity = 80;
+                _viewModel.WindowService.SetTransparency(window.Handle, percent);
+                window.Opacity = percent;
             }
-            _viewModel.StatusText = "Set all windows to 80% opacity";
+
+            if (_viewModel.SelectedGroup != null)
+            {
+                _viewModel.StatusText = $"Set group '{_viewModel.SelectedGroup.Name}' windows to {percent}% opacity";
+            }
+            else if (_selectedWindowInfo != null)
+            {
+                _viewModel.StatusText = $"Set windows related to '{_selectedWindowInfo.Title}' to {percent}% opacity";
+            }
+            else
+            {
+                _viewModel.StatusText = $"Set all windows to {percent}% opacity";
+            }
         }
 
         private void SetAllTo100Percent_Click(object sender, RoutedEventArgs e)
         {
-            foreach (var window in _viewModel.Windows)
+            var targets = GetBulkTargetWindows().ToList();
+            foreach (var window in targets)
             {
                 _viewModel.WindowService.SetTransparency(window.Handle, 100);
                 window.Opacity = 100;
             }
-            _viewModel.StatusText = "Set all windows to 100% opacity";
+
+            if (_viewModel.SelectedGroup != null)
+            {
+                _viewModel.StatusText = $"Set group '{_viewModel.SelectedGroup.Name}' windows to 100% opacity";
+            }
+            else if (_selectedWindowInfo != null)
+            {
+                _viewModel.StatusText = $"Set windows related to '{_selectedWindowInfo.Title}' to 100% opacity";
+            }
+            else
+            {
+                _viewModel.StatusText = "Set all windows to 100% opacity";
+            }
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)

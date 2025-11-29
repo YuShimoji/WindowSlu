@@ -75,6 +75,19 @@ namespace WindowSlu.ViewModels
         /// </summary>
         public ObservableCollection<WindowGroup> WindowGroups => GroupingService.Groups;
 
+        public int BulkOpacityPercent
+        {
+            get => _settingsService.Settings.BulkOpacityPercent;
+            set
+            {
+                if (_settingsService.Settings.BulkOpacityPercent != value)
+                {
+                    _settingsService.Settings.BulkOpacityPercent = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         public MainViewModel(SettingsService settingsService, WindowService windowService, MainWindow mainWindow)
         {
             _settingsService = settingsService;

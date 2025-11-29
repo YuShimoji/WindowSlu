@@ -18,6 +18,7 @@ namespace WindowSlu.Services
         private readonly GroupingService _groupingService;
         private readonly WindowService _windowService;
         private IntPtr _eventHook;
+        private readonly WinEventDelegate _winEventDelegate;
         private readonly object _lock = new object();
         private readonly Dictionary<IntPtr, Point> _lastPositions = new Dictionary<IntPtr, Point>();
         private readonly Timer _debounceTimer;
@@ -43,12 +44,13 @@ namespace WindowSlu.Services
             _windowService = windowService ?? throw new ArgumentNullException(nameof(windowService));
             _debounceTimer = new Timer(ProcessPendingMoves, null, Timeout.Infinite, Timeout.Infinite);
 
-            // WinEventHook のセットアップ
-            _eventHook = SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE, IntPtr.Zero, WinEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
-            if (_eventHook == IntPtr.Zero)
-            {
-                LoggingService.LogError("Failed to set WinEventHook for location changes.");
-            }
+            // WinEvent のコールバックデリゲートをフィールドに保持して GC されないようにする
+            _winEventDelegate = WinEventProc;
+
+            // 連動ドラッグ機能は現在無効化（無限ループ問題の修正が必要）
+            // TODO: ユーザーがドラッグ中かどうかを判定し、自分が移動させたウィンドウからのイベントを無視するロジックを追加する
+            _eventHook = IntPtr.Zero;
+            LoggingService.LogInfo("LinkedDragService: WinEventHook is currently disabled.");
         }
 
         private void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)

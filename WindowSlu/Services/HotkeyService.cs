@@ -50,9 +50,13 @@ namespace WindowSlu.Services
 
             foreach (var setting in settings)
             {
-                if (setting.IsEnabled && setting.Key != Key.None)
+                if (setting.IsEnabled && setting.Key != Key.None && setting.Modifiers != ModifierKeys.None)
                 {
                     RegisterHotkey(setting);
+                }
+                else if (setting.IsEnabled && setting.Modifiers == ModifierKeys.None)
+                {
+                    LoggingService.LogInfo($"Skipping hotkey without modifiers: {setting.Key}");
                 }
             }
         }

@@ -22,6 +22,12 @@ namespace WindowSlu.Models
         [JsonPropertyName("window_height")]
         public double WindowHeight { get; set; } = 600;
 
+        [JsonPropertyName("bulk_opacity_percent")]
+        public int BulkOpacityPercent { get; set; } = 80;
+
+        [JsonPropertyName("hotkeys_enabled")]
+        public bool HotkeysEnabled { get; set; } = false;
+
         [JsonPropertyName("hotkey_settings")]
         public List<HotkeySetting> HotkeySettings { get; set; } = new List<HotkeySetting>
         {

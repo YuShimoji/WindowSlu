@@ -486,6 +486,56 @@ namespace WindowSlu
             }
         }
 
+        // --- Group Bulk Control Event Handlers ---
+        private void GroupOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (sender is Slider slider && slider.IsMouseCaptureWithin && slider.Tag is WindowGroup group)
+            {
+                int opacity = (int)e.NewValue;
+                foreach (var window in group.Windows)
+                {
+                    SetTransparency(window.Handle, opacity);
+                    window.Opacity = opacity;
+                }
+            }
+        }
+
+        private void GroupSizeApply_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && button.Tag is WindowGroup group)
+            {
+                // ボタンの親要素からTextBoxを探す
+                var parent = button.Parent as StackPanel;
+                if (parent == null) return;
+
+                int width = 800;
+                int height = 600;
+
+                foreach (var child in parent.Children)
+                {
+                    if (child is TextBox textBox)
+                    {
+                        if (textBox.Name == "GroupWidthTextBox" && int.TryParse(textBox.Text, out int w))
+                        {
+                            width = w;
+                        }
+                        else if (textBox.Name == "GroupHeightTextBox" && int.TryParse(textBox.Text, out int h))
+                        {
+                            height = h;
+                        }
+                    }
+                }
+
+                // グループ内の全ウィンドウにサイズを適用
+                foreach (var window in group.Windows)
+                {
+                    _viewModel.WindowService.SetWindowSize(window.Handle, width, height);
+                    window.Width = width;
+                    window.Height = height;
+                }
+            }
+        }
+
         private void ThemeToggleButton_Click(object sender, RoutedEventArgs e) 
         {
             _currentTheme = _currentTheme == Services.Theme.Dark ? Services.Theme.Light : Services.Theme.Dark; 

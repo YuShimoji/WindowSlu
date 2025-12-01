@@ -491,22 +491,27 @@
                             <!-- グループヘッダーのテンプレート -->
                             <HierarchicalDataTemplate DataType="{x:Type local:WindowGroup}" ItemsSource="{Binding Windows}">
                                 <Grid Margin="0,5">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <Image Source="{Binding GroupIcon}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" Grid.Column="0"/>
+                                    <!-- Row 0: グループ名・連動ドラッグ・カスケード -->
+                                    <Image Source="{Binding GroupIcon}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" Grid.Column="0" Grid.Row="0"/>
                                     
-                                    <TextBlock Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Grid.Column="1" Grid.Row="0" VerticalAlignment="Center">
                                         <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource ForegroundColor}"/>
                                         <Run Text=" (" Foreground="{DynamicResource MutedForegroundColor}"/>
                                         <Run Text="{Binding WindowCount, Mode=OneWay}" Foreground="{DynamicResource MutedForegroundColor}"/>
                                         <Run Text=")" Foreground="{DynamicResource MutedForegroundColor}"/>
                                     </TextBlock>
 
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                    <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal">
                                         <!-- 連動ドラッグ有効/無効トグル -->
                                         <ToggleButton Style="{StaticResource LinkedDragToggleButtonStyle}"
                                                       IsChecked="{Binding LinkedDragEnabled, Mode=TwoWay}"
@@ -515,6 +520,48 @@
                                         <Button Style="{StaticResource CascadeButtonStyle}"
                                                 Click="CascadeButton_Click"
                                                 Tag="{Binding}"/>
+                                    </StackPanel>
+
+                                    <!-- Row 1: グループ一括制御（透明度・サイズ） -->
+                                    <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,4,0,0">
+                                        <!-- 一括透明度スライダー -->
+                                        <TextBlock Text="Opacity:" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="0,0,4,0"/>
+                                        <Slider x:Name="GroupOpacitySlider"
+                                                Style="{StaticResource ThemedSliderStyle}"
+                                                Minimum="0" Maximum="100" 
+                                                Value="100"
+                                                Width="80"
+                                                VerticalAlignment="Center"
+                                                ValueChanged="GroupOpacitySlider_ValueChanged"
+                                                Tag="{Binding}"/>
+                                        <TextBlock Text="%" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="2,0,10,0"/>
+                                        
+                                        <!-- 一括サイズ設定 -->
+                                        <TextBlock Text="Size:" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="0,0,4,0"/>
+                                        <TextBox x:Name="GroupWidthTextBox"
+                                                 Width="45" Height="18" FontSize="10"
+                                                 Text="800"
+                                                 VerticalContentAlignment="Center"
+                                                 Background="{DynamicResource BackgroundColor}"
+                                                 Foreground="{DynamicResource ForegroundColor}"
+                                                 BorderBrush="{DynamicResource BorderColor}"
+                                                 Tag="{Binding}"/>
+                                        <TextBlock Text="x" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="2,0,2,0"/>
+                                        <TextBox x:Name="GroupHeightTextBox"
+                                                 Width="45" Height="18" FontSize="10"
+                                                 Text="600"
+                                                 VerticalContentAlignment="Center"
+                                                 Background="{DynamicResource BackgroundColor}"
+                                                 Foreground="{DynamicResource ForegroundColor}"
+                                                 BorderBrush="{DynamicResource BorderColor}"
+                                                 Tag="{Binding}"/>
+                                        <Button Content="Apply" 
+                                                FontSize="10" 
+                                                Width="40" Height="18"
+                                                Margin="4,0,0,0"
+                                                Click="GroupSizeApply_Click"
+                                                Tag="{Binding}"
+                                                ToolTip="Apply size to all windows in this group"/>
                                     </StackPanel>
                                 </Grid>
                             </HierarchicalDataTemplate>

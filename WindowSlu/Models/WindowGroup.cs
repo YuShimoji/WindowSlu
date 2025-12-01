@@ -18,7 +18,7 @@ namespace WindowSlu.Models
         private bool _isExpanded = true;
         private ImageSource? _groupIcon;
         private bool _isSelected;
-        private bool _linkedDragEnabled = true;
+        private bool _linkedDragEnabled = false;
 
         /// <summary>
         /// グループの一意識別子 (GUID)

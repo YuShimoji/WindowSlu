@@ -376,12 +376,12 @@ public class LinkedDragService
 - [x] カスケード方向選択UI
 - [x] オフセット設定UI
 
-### Phase 5: 連動ドラッグ ⏳
+### Phase 5: 連動ドラッグ ✅
 
-- [ ] `LinkedDragService`実装
-- [ ] WinEventHook統合
-- [ ] 連動ドラッグ開始/終了UI
-- [ ] パフォーマンス検証・調整
+- [x] `LinkedDragService`実装
+- [x] WinEventHook統合
+- [x] 連動ドラッグ開始/終了UI
+- [x] パフォーマンス検証・調整
 
 ---
 

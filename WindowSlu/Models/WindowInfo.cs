@@ -19,7 +19,7 @@ namespace WindowSlu.Models
         private int _width;
         private int _height;
         private string _monitorId = string.Empty;
-        private bool _includeInLinkedDrag = true;
+        private bool _includeInLinkedDrag = false;
 
         public IntPtr Handle { get; set; }
         

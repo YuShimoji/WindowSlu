@@ -466,7 +466,7 @@ namespace WindowSlu
         }
         private void WindowWidthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (sender is Slider slider && slider.DataContext is WindowInfo info)
+            if (sender is Slider slider && slider.IsMouseCaptureWithin && slider.DataContext is WindowInfo info)
             {
                 int newWidth = (int)e.NewValue;
                 int height = info.Height > 0 ? info.Height : 600;
@@ -477,7 +477,7 @@ namespace WindowSlu
 
         private void WindowHeightSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (sender is Slider slider && slider.DataContext is WindowInfo info)
+            if (sender is Slider slider && slider.IsMouseCaptureWithin && slider.DataContext is WindowInfo info)
             {
                 int newHeight = (int)e.NewValue;
                 int width = info.Width > 0 ? info.Width : 800;

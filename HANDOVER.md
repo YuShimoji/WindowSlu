@@ -34,7 +34,8 @@
 
 | ファイル | 内容 |
 |----------|------|
-| `WindowSlu-v2.1-GroupBulkControl.zip` | 最新リリース（グループ一括制御対応） |
+| `WindowSlu-v2.2-win-x64.zip` | 最新リリース（UIバグ修正・ドラッグ&ドロップ対応） |
+| `WindowSlu-v2.1-GroupBulkControl.zip` | グループ一括制御対応 |
 | `WindowSlu-v2.0.1-win-x64.zip` | 連動ドラッグ修正版 |
 | `WindowSlu-v2.0-win-x64.zip` | v2.0初期リリース |
 

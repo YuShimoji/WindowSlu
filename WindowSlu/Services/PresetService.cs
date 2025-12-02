@@ -103,6 +103,10 @@ namespace WindowSlu.Services
             var preset = new WindowPreset
             {
                 Name = name,
+                Width = 800,
+                Height = 600,
+                Opacity = 100,
+                IsTopMost = false,
                 CreatedAt = DateTime.Now,
                 ModifiedAt = DateTime.Now
             };

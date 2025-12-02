@@ -541,6 +541,49 @@ namespace WindowSlu
             _currentTheme = _currentTheme == Services.Theme.Dark ? Services.Theme.Light : Services.Theme.Dark; 
             _themeService.ApplyTheme(_currentTheme);
         }
+
+        // --- Drag & Drop Event Handlers ---
+        private void WindowItem_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed && sender is Grid grid && grid.Tag is WindowInfo windowInfo)
+            {
+                DragDrop.DoDragDrop(grid, windowInfo, DragDropEffects.Move);
+            }
+        }
+
+        private void GroupHeader_DragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(typeof(WindowInfo)))
+            {
+                e.Effects = DragDropEffects.Move;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+            e.Handled = true;
+        }
+
+        private void GroupHeader_Drop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(typeof(WindowInfo)) && sender is Grid grid && grid.Tag is WindowGroup targetGroup)
+            {
+                var windowInfo = e.Data.GetData(typeof(WindowInfo)) as WindowInfo;
+                if (windowInfo != null)
+                {
+                    // 元のグループからウィンドウを削除
+                    var sourceGroup = _viewModel.WindowGroups.FirstOrDefault(g => g.Windows.Contains(windowInfo));
+                    if (sourceGroup != null && sourceGroup != targetGroup)
+                    {
+                        sourceGroup.Windows.Remove(windowInfo);
+                        targetGroup.Windows.Add(windowInfo);
+                        windowInfo.GroupId = targetGroup.Id;
+                        _viewModel.StatusText = $"Moved '{windowInfo.Title}' to group '{targetGroup.Name}'";
+                    }
+                }
+            }
+            e.Handled = true;
+        }
         
         // --- Tray Icon ---
         private void TrayButton_Click(object sender, RoutedEventArgs e) { if(MyNotifyIcon != null) { Hide(); MyNotifyIcon.Visibility = Visibility.Visible; } }

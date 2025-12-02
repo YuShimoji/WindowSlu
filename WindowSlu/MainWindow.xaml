@@ -16,6 +16,13 @@
     <Window.Resources>
         <converters:BoolToTopMostTextConverter x:Key="BoolToTopMostTextConverter"/>
         <converters:PercentToWidthMultiConverter x:Key="PercentToWidthMultiConverter"/>
+        
+        <!-- CascadeDirection enum values for ComboBox -->
+        <ObjectDataProvider x:Key="CascadeDirectionValues" MethodName="GetValues" ObjectType="{x:Type local:CascadeDirection}">
+            <ObjectDataProvider.MethodParameters>
+                <x:Type TypeName="local:CascadeDirection"/>
+            </ObjectDataProvider.MethodParameters>
+        </ObjectDataProvider>
 
         <!-- TreeView Expander Toggle Button Style -->
         <Style x:Key="ExpanderToggleButtonStyle" TargetType="ToggleButton">
@@ -490,7 +497,7 @@
                         <TreeView.Resources>
                             <!-- グループヘッダーのテンプレート -->
                             <HierarchicalDataTemplate DataType="{x:Type local:WindowGroup}" ItemsSource="{Binding Windows}">
-                                <Grid Margin="0,5">
+                                <Grid Margin="0,5" AllowDrop="True" Drop="GroupHeader_Drop" DragOver="GroupHeader_DragOver" Tag="{Binding}">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
@@ -568,7 +575,7 @@
 
                             <!-- ウィンドウアイテムのテンプレート -->
                             <DataTemplate DataType="{x:Type local:WindowInfo}">
-                                <Grid Margin="0,3">
+                                <Grid Margin="0,3" MouseMove="WindowItem_MouseMove" Tag="{Binding}">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
@@ -753,7 +760,9 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Name:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <TextBox Grid.Column="1" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
+                                    <TextBox Grid.Column="1" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
+                                             Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
+                                             BorderBrush="{DynamicResource BorderColor}"/>
                                 </Grid>
 
                                 <Grid Margin="0,5">
@@ -764,9 +773,13 @@
                                         <ColumnDefinition Width="80"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Size (WxH):" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <TextBox Grid.Column="1" Text="{Binding Width, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
+                                    <TextBox Grid.Column="1" Text="{Binding Width, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
+                                             Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
+                                             BorderBrush="{DynamicResource BorderColor}"/>
                                     <TextBlock Grid.Column="2" Text="x" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <TextBox Grid.Column="3" Text="{Binding Height, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
+                                    <TextBox Grid.Column="3" Text="{Binding Height, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
+                                             Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
+                                             BorderBrush="{DynamicResource BorderColor}"/>
                                 </Grid>
 
                                 <Grid Margin="0,5">
@@ -794,9 +807,13 @@
                                         <ColumnDefinition Width="80"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Offset (X,Y):" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <TextBox Grid.Column="1" Text="{Binding CascadeOffsetX, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
+                                    <TextBox Grid.Column="1" Text="{Binding CascadeOffsetX, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
+                                             Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
+                                             BorderBrush="{DynamicResource BorderColor}"/>
                                     <TextBlock Grid.Column="2" Text="," VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <TextBox Grid.Column="3" Text="{Binding CascadeOffsetY, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
+                                    <TextBox Grid.Column="3" Text="{Binding CascadeOffsetY, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
+                                             Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
+                                             BorderBrush="{DynamicResource BorderColor}"/>
                                 </Grid>
 
                                 <Grid Margin="0,5" IsEnabled="{Binding EnableCascade}">
@@ -805,14 +822,10 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Direction:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <ComboBox Grid.Column="1" SelectedItem="{Binding CascadeDirection}" Margin="5,0" Width="120" HorizontalAlignment="Left">
-                                        <ComboBoxItem Content="BottomRight"/>
-                                        <ComboBoxItem Content="TopRight"/>
-                                        <ComboBoxItem Content="BottomLeft"/>
-                                        <ComboBoxItem Content="TopLeft"/>
-                                        <ComboBoxItem Content="Right"/>
-                                        <ComboBoxItem Content="Down"/>
-                                    </ComboBox>
+                                    <ComboBox Grid.Column="1" 
+                                              SelectedItem="{Binding CascadeDirection, Mode=TwoWay}" 
+                                              ItemsSource="{Binding Source={StaticResource CascadeDirectionValues}}"
+                                              Margin="5,0" Width="120" HorizontalAlignment="Left"/>
                                 </Grid>
                             </StackPanel>
                         </ScrollViewer>

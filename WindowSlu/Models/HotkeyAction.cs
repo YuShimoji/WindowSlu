@@ -8,6 +8,7 @@ namespace WindowSlu.Models
         DecreaseOpacity,
         ToggleTopMost,
         ToggleClickThrough,
-        SetAllTo80
+        SetAllTo80,
+        ApplyPreset // プリセット適用（ParameterにプリセットインデックスまたはPresetIdを使用）
     }
 } 

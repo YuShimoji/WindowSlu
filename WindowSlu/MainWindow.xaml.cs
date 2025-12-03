@@ -152,8 +152,18 @@ namespace WindowSlu
             }
         }
 
-        private void HandleHotkey(HotkeyAction action, int parameter)
+        private void HandleHotkey(HotkeySetting setting)
         {
+            var action = setting.Action;
+            var parameter = setting.Parameter;
+
+            // プリセット適用アクションは別処理
+            if (action == HotkeyAction.ApplyPreset)
+            {
+                HandleApplyPresetHotkey(setting.PresetId);
+                return;
+            }
+
             IntPtr foregroundWindow = WindowService.GetForegroundWindow();
             if (foregroundWindow == IntPtr.Zero)
             {
@@ -231,6 +241,64 @@ namespace WindowSlu
             }
         }
 
+        /// <summary>
+        /// すべてのプリセットのホットキーを登録
+        /// </summary>
+        private void RegisterAllPresetHotkeys()
+        {
+            if (_hotkeyService == null) return;
+
+            foreach (var preset in _viewModel.PresetService.Presets)
+            {
+                if (!string.IsNullOrWhiteSpace(preset.HotKey))
+                {
+                    _hotkeyService.RegisterPresetHotkey(preset.Id, preset.HotKey);
+                    LoggingService.LogInfo($"Registered hotkey '{preset.HotKey}' for preset '{preset.Name}'");
+                }
+            }
+        }
+
+        /// <summary>
+        /// プリセット適用ホットキーの処理
+        /// </summary>
+        private void HandleApplyPresetHotkey(string? presetId)
+        {
+            if (string.IsNullOrWhiteSpace(presetId))
+            {
+                LoggingService.LogInfo("Preset hotkey triggered but no PresetId specified.");
+                return;
+            }
+
+            var preset = _viewModel.PresetService.GetPresetById(presetId);
+            if (preset == null)
+            {
+                LoggingService.LogInfo($"Preset with ID {presetId} not found.");
+                _viewModel.StatusText = $"Preset not found: {presetId}";
+                return;
+            }
+
+            LoggingService.LogInfo($"Applying preset '{preset.Name}' via hotkey.");
+
+            // ターゲットフィルタに基づいて適用
+            bool hasFilter = !string.IsNullOrWhiteSpace(preset.TargetProcessName) ||
+                             !string.IsNullOrWhiteSpace(preset.TargetGroupId);
+
+            if (hasFilter)
+            {
+                int appliedCount = _viewModel.PresetService.ApplyPresetWithFilter(preset, _viewModel.WindowGroups);
+                _viewModel.StatusText = $"Applied preset '{preset.Name}' to {appliedCount} groups via hotkey";
+            }
+            else
+            {
+                // 全グループに適用
+                foreach (var group in _viewModel.WindowGroups)
+                {
+                    _viewModel.PresetService.ApplyPresetToGroup(preset, group);
+                }
+                _viewModel.StatusText = $"Applied preset '{preset.Name}' to all windows via hotkey";
+            }
+        }
+
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             LoggingService.LogInfo("MainWindow_Loaded event triggered.");
@@ -242,6 +310,9 @@ namespace WindowSlu
             if (_settingsService.Settings.HotkeysEnabled)
             {
                 _hotkeyService = new HotkeyService(_hwnd, _settingsService, HandleHotkey);
+                
+                // 既存プリセットのホットキーを登録
+                RegisterAllPresetHotkeys();
             }
             
             // Add a hook to receive window messages
@@ -656,9 +727,56 @@ namespace WindowSlu
             if (PresetComboBox.SelectedItem is WindowPreset preset)
             {
                 string name = preset.Name;
+                // ホットキーを解除
+                _hotkeyService?.UnregisterPresetHotkey(preset.Id);
                 _viewModel.PresetService.DeletePreset(preset.Id);
                 _viewModel.StatusText = $"Deleted preset: {name}";
             }
+        }
+
+        /// <summary>
+        /// ホットキー入力用のキー入力ハンドラ
+        /// </summary>
+        private void HotKeyTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (sender is not System.Windows.Controls.TextBox textBox) return;
+            if (PresetComboBox.SelectedItem is not WindowPreset preset) return;
+
+            e.Handled = true;
+
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+
+            // 修飾キーのみの場合は無視
+            if (key == Key.LeftCtrl || key == Key.RightCtrl ||
+                key == Key.LeftAlt || key == Key.RightAlt ||
+                key == Key.LeftShift || key == Key.RightShift ||
+                key == Key.LWin || key == Key.RWin)
+            {
+                return;
+            }
+
+            // Escapeでクリア
+            if (key == Key.Escape)
+            {
+                preset.HotKey = null;
+                _hotkeyService?.UnregisterPresetHotkey(preset.Id);
+                _viewModel.StatusText = $"Hotkey cleared for preset '{preset.Name}'";
+                return;
+            }
+
+            // ホットキー文字列を構築
+            var parts = new List<string>();
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) parts.Add("Ctrl");
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)) parts.Add("Alt");
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) parts.Add("Shift");
+            parts.Add(key.ToString());
+
+            var hotKeyString = string.Join("+", parts);
+            preset.HotKey = hotKeyString;
+
+            // ホットキーを登録
+            _hotkeyService?.RegisterPresetHotkey(preset.Id, hotKeyString);
+            _viewModel.StatusText = $"Hotkey '{hotKeyString}' set for preset '{preset.Name}'";
         }
 
         private void SavePresets_Click(object sender, RoutedEventArgs e)

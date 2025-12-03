@@ -21,6 +21,9 @@ namespace WindowSlu.Models
         private string? _targetProcessName;
         private string? _targetGroupId;
 
+        // ショートカットキー設定
+        private string? _hotKey;
+
         // ウィンドウ設定
         private int? _width;
         private int? _height;
@@ -97,6 +100,20 @@ namespace WindowSlu.Models
             get => _targetGroupId;
             set { if (_targetGroupId != value) { _targetGroupId = value; OnPropertyChanged(); _modifiedAt = DateTime.Now; } }
         }
+
+        /// <summary>
+        /// ショートカットキー（例: "F1", "Ctrl+1", "Ctrl+Shift+A"）
+        /// </summary>
+        public string? HotKey
+        {
+            get => _hotKey;
+            set { if (_hotKey != value) { _hotKey = value; OnPropertyChanged(); OnPropertyChanged(nameof(HotKeyDisplay)); _modifiedAt = DateTime.Now; } }
+        }
+
+        /// <summary>
+        /// ショートカットキーの表示用文字列
+        /// </summary>
+        public string HotKeyDisplay => string.IsNullOrWhiteSpace(HotKey) ? "(なし)" : HotKey;
 
         /// <summary>
         /// ウィンドウ幅（nullの場合は変更しない）

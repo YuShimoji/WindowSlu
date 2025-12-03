@@ -11,6 +11,11 @@ namespace WindowSlu.Models
         public bool IsEnabled { get; set; } = true;
         public Key Key { get; set; }
         public ModifierKeys Modifiers { get; set; }
+        
+        /// <summary>
+        /// ApplyPresetアクション用のプリセットID
+        /// </summary>
+        public string? PresetId { get; set; }
 
         public HotkeySetting()
         {

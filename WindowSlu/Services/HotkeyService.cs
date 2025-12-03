@@ -11,10 +11,11 @@ namespace WindowSlu.Services
     public class HotkeyService : IDisposable
     {
         private readonly SettingsService _settingsService;
-        private readonly Action<HotkeyAction, int> _hotkeyCallback;
+        private readonly Action<HotkeySetting> _hotkeyCallback;
         private readonly IntPtr _windowHandle;
         private readonly Dictionary<int, HotkeySetting> _registeredHotkeys = new Dictionary<int, HotkeySetting>();
         private int _currentHotkeyId = 1;
+        private readonly List<HotkeySetting> _presetHotkeys = new List<HotkeySetting>();
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
@@ -22,7 +23,7 @@ namespace WindowSlu.Services
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
-        public HotkeyService(IntPtr windowHandle, SettingsService settingsService, Action<HotkeyAction, int> hotkeyCallback)
+        public HotkeyService(IntPtr windowHandle, SettingsService settingsService, Action<HotkeySetting> hotkeyCallback)
         {
             _windowHandle = windowHandle;
             _settingsService = settingsService;
@@ -36,8 +37,77 @@ namespace WindowSlu.Services
             if (_registeredHotkeys.TryGetValue(hotkeyId, out var hotkeySetting))
             {
                 LoggingService.LogInfo($"Hotkey ID {hotkeyId} detected for action {hotkeySetting.Action}");
-                _hotkeyCallback?.Invoke(hotkeySetting.Action, hotkeySetting.Parameter);
+                _hotkeyCallback?.Invoke(hotkeySetting);
             }
+        }
+
+        /// <summary>
+        /// プリセット用のホットキーを登録
+        /// </summary>
+        public void RegisterPresetHotkey(string presetId, string hotKeyString)
+        {
+            if (string.IsNullOrWhiteSpace(hotKeyString)) return;
+
+            // 既存のプリセットホットキーを解除
+            UnregisterPresetHotkey(presetId);
+
+            var setting = ParseHotKeyString(hotKeyString, presetId);
+            if (setting != null && setting.Key != Key.None)
+            {
+                setting.IsEnabled = true;
+                _presetHotkeys.Add(setting);
+                RegisterHotkey(setting);
+            }
+        }
+
+        /// <summary>
+        /// プリセット用のホットキーを解除
+        /// </summary>
+        public void UnregisterPresetHotkey(string presetId)
+        {
+            var existing = _presetHotkeys.FirstOrDefault(h => h.PresetId == presetId);
+            if (existing != null)
+            {
+                var registeredId = _registeredHotkeys.FirstOrDefault(x => x.Value == existing).Key;
+                if (registeredId != 0)
+                {
+                    UnregisterHotKey(_windowHandle, registeredId);
+                    _registeredHotkeys.Remove(registeredId);
+                }
+                _presetHotkeys.Remove(existing);
+            }
+        }
+
+        /// <summary>
+        /// ホットキー文字列をパースしてHotkeySettingを生成
+        /// </summary>
+        private HotkeySetting? ParseHotKeyString(string hotKeyString, string presetId)
+        {
+            var setting = new HotkeySetting
+            {
+                Action = HotkeyAction.ApplyPreset,
+                PresetId = presetId,
+                Modifiers = ModifierKeys.None,
+                Key = Key.None
+            };
+
+            var parts = hotKeyString.Split('+').Select(p => p.Trim()).ToList();
+            foreach (var part in parts)
+            {
+                var upper = part.ToUpperInvariant();
+                if (upper == "CTRL" || upper == "CONTROL")
+                    setting.Modifiers |= ModifierKeys.Control;
+                else if (upper == "ALT")
+                    setting.Modifiers |= ModifierKeys.Alt;
+                else if (upper == "SHIFT")
+                    setting.Modifiers |= ModifierKeys.Shift;
+                else if (upper == "WIN" || upper == "WINDOWS")
+                    setting.Modifiers |= ModifierKeys.Windows;
+                else if (Enum.TryParse<Key>(part, true, out var key))
+                    setting.Key = key;
+            }
+
+            return setting;
         }
 
         public void ReloadSettings()

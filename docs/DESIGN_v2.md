@@ -383,9 +383,91 @@ public class LinkedDragService
 - [x] 連動ドラッグ開始/終了UI
 - [x] パフォーマンス検証・調整
 
+### Phase 6: グループ編集UI強化 ✅
+
+- [x] 上下スプリットレイアウト実装（Windows タブ）
+- [x] 上ペイン: フラットなウィンドウ一覧（ListView）
+- [x] 下ペイン: グループ TreeView（既存機能維持）
+- [x] GridSplitter による高さ調整
+- [x] ドラッグ&ドロップによるグループ間移動
+- [x] グループ一括制御（透明度スライダー、サイズ Apply）
+
+### Phase 7: 高度なプリセット機能 🚧
+
+- [ ] 条件付き適用（TargetProcessName / TargetGroupId）
+- [ ] 適用対象フィルタUI
+- [ ] ショートカットキーからの即時適用
+
 ---
 
-## 8. リスクと対策
+## 9. 上下スプリットUI設計（Phase 6）
+
+### 9.1 レイアウト構成
+
+```
+┌─────────────────────────────────────────┐
+│ コントロールバー (Bulk opacity / 100%)  │
+├─────────────────────────────────────────┤
+│ 上ペイン: All Windows (ListView)        │
+│  ┌─────┬────────────────────┬─────────┐ │
+│  │ Icon│ Title              │ Process │ │
+│  ├─────┼────────────────────┼─────────┤ │
+│  │ 🪟  │ Document.txt       │ notepad │ │
+│  │ 🪟  │ Untitled           │ notepad │ │
+│  └─────┴────────────────────┴─────────┘ │
+├═════════════════════════════════════════┤ ← GridSplitter
+│ 下ペイン: Groups (TreeView)             │
+│  ▼ notepad (2 windows)                  │
+│    ├─ Document.txt  [slider] 📌 👻 🔗   │
+│    └─ Untitled      [slider] 📌 👻 🔗   │
+│  ▼ Code (3 windows)                     │
+│    ├─ ...                               │
+└─────────────────────────────────────────┘
+```
+
+### 9.2 ドラッグ&ドロップ仕様
+
+| ドラッグ元 | ドロップ先 | 動作 |
+|-----------|-----------|------|
+| 上ペイン ウィンドウ行 | 下ペイン グループヘッダー | 対象グループに移動 |
+| 下ペイン ウィンドウ行 | 下ペイン グループヘッダー | 対象グループに移動 |
+
+**実装ポイント:**
+- `MouseMove` イベントで `DragDrop.DoDragDrop()` を開始
+- グループヘッダーに `AllowDrop="True"` + `DragOver` / `Drop` イベント
+- `WindowInfo` オブジェクトを DataObject として転送
+- 元グループから削除 → 先グループに追加 → `GroupId` 更新
+
+### 9.3 XAML構造
+
+```xml
+<Grid Grid.Row="1">
+    <Grid.RowDefinitions>
+        <RowDefinition Height="2*"/>   <!-- 上ペイン -->
+        <RowDefinition Height="Auto"/> <!-- スプリッタ -->
+        <RowDefinition Height="3*"/>   <!-- 下ペイン -->
+    </Grid.RowDefinitions>
+
+    <!-- 上ペイン: フラットなウィンドウ一覧 -->
+    <Border Grid.Row="0" Background="{DynamicResource CardBackgroundColor}">
+        <ListView ItemsSource="{Binding Windows}" ...>
+            <!-- ドラッグ可能なアイテムテンプレート -->
+        </ListView>
+    </Border>
+
+    <!-- スプリッタ -->
+    <GridSplitter Grid.Row="1" Height="5" .../>
+
+    <!-- 下ペイン: 既存のグループ TreeView -->
+    <TreeView Grid.Row="2" ItemsSource="{Binding WindowGroups}" ...>
+        <!-- 既存のグループ/ウィンドウテンプレート -->
+    </TreeView>
+</Grid>
+```
+
+---
+
+## 10. リスクと対策
 
 | リスク | 影響度 | 対策 |
 |--------|--------|------|
@@ -396,5 +478,5 @@ public class LinkedDragService
 
 ---
 
-*Document Version: 1.1*
-*Last Updated: 2024-11-28*
+*Document Version: 1.2*
+*Last Updated: 2024-12-03*

@@ -70,6 +70,41 @@ namespace WindowSlu.ViewModels
         /// </summary>
         public ObservableCollection<WindowInfo> Windows { get; } = new ObservableCollection<WindowInfo>();
 
+        private string _windowFilterText = string.Empty;
+        /// <summary>
+        /// ウィンドウフィルタ用のテキスト
+        /// </summary>
+        public string WindowFilterText
+        {
+            get => _windowFilterText;
+            set
+            {
+                if (_windowFilterText != value)
+                {
+                    _windowFilterText = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(FilteredWindows));
+                }
+            }
+        }
+
+        /// <summary>
+        /// フィルタ適用後のウィンドウリスト
+        /// </summary>
+        public IEnumerable<WindowInfo> FilteredWindows
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(WindowFilterText))
+                    return Windows;
+
+                var filter = WindowFilterText.ToLowerInvariant();
+                return Windows.Where(w =>
+                    (w.Title?.ToLowerInvariant().Contains(filter) ?? false) ||
+                    (w.ProcessName?.ToLowerInvariant().Contains(filter) ?? false));
+            }
+        }
+
         /// <summary>
         /// グループ化されたウィンドウリスト
         /// </summary>
@@ -171,6 +206,7 @@ namespace WindowSlu.ViewModels
                 // グループ化を更新
                 GroupingService.UpdateGroups(Windows);
                 OnPropertyChanged(nameof(WindowGroups));
+                OnPropertyChanged(nameof(FilteredWindows));
             });
         }
 

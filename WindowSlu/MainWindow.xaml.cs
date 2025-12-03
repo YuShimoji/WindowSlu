@@ -609,6 +609,9 @@ namespace WindowSlu
         {
             if (PresetComboBox.SelectedItem is WindowPreset preset)
             {
+                bool hasFilter = !string.IsNullOrWhiteSpace(preset.TargetProcessName) || 
+                                 !string.IsNullOrWhiteSpace(preset.TargetGroupId);
+
                 // 選択されたグループにプリセットを適用
                 if (_viewModel.SelectedGroup != null)
                 {
@@ -619,6 +622,15 @@ namespace WindowSlu
                 {
                     _viewModel.PresetService.ApplyPresetToWindow(preset, _selectedWindowInfo);
                     _viewModel.StatusText = $"Applied preset '{preset.Name}' to window";
+                }
+                else if (hasFilter)
+                {
+                    // フィルタ条件に一致するグループにのみ適用
+                    int appliedCount = _viewModel.PresetService.ApplyPresetWithFilter(preset, _viewModel.WindowGroups);
+                    string filterDesc = !string.IsNullOrWhiteSpace(preset.TargetProcessName) 
+                        ? $"process '{preset.TargetProcessName}'" 
+                        : $"group '{preset.TargetGroupId}'";
+                    _viewModel.StatusText = $"Applied preset '{preset.Name}' to {appliedCount} groups matching {filterDesc}";
                 }
                 else
                 {

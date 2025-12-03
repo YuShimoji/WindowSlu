@@ -486,240 +486,348 @@
                             </Button>
                         </Grid>
 
-                        <TreeView Grid.Row="1" 
-                      x:Name="WindowTreeView"
-                      ItemsSource="{Binding WindowGroups}"
-                      Background="Transparent"
-                      BorderThickness="0"
-                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                      SelectedItemChanged="WindowTreeView_SelectedItemChanged">
+                        <Grid Grid.Row="1">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="2*"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="3*"/>
+                            </Grid.RowDefinitions>
 
-                        <TreeView.Resources>
-                            <!-- グループヘッダーのテンプレート -->
-                            <HierarchicalDataTemplate DataType="{x:Type local:WindowGroup}" ItemsSource="{Binding Windows}">
-                                <Grid Margin="0,5" AllowDrop="True" Drop="GroupHeader_Drop" DragOver="GroupHeader_DragOver" Tag="{Binding}">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <!-- Row 0: グループ名・連動ドラッグ・カスケード -->
-                                    <Image Source="{Binding GroupIcon}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" Grid.Column="0" Grid.Row="0"/>
-                                    
-                                    <TextBlock Grid.Column="1" Grid.Row="0" VerticalAlignment="Center">
-                                        <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource ForegroundColor}"/>
-                                        <Run Text=" (" Foreground="{DynamicResource MutedForegroundColor}"/>
-                                        <Run Text="{Binding WindowCount, Mode=OneWay}" Foreground="{DynamicResource MutedForegroundColor}"/>
-                                        <Run Text=")" Foreground="{DynamicResource MutedForegroundColor}"/>
-                                    </TextBlock>
-
-                                    <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal">
-                                        <!-- 連動ドラッグ有効/無効トグル -->
-                                        <ToggleButton Style="{StaticResource LinkedDragToggleButtonStyle}"
-                                                      IsChecked="{Binding LinkedDragEnabled, Mode=TwoWay}"
-                                                      ToolTip="Enable Linked Drag for this group"/>
-                                        <!-- Cascadeアイコンボタン -->
-                                        <Button Style="{StaticResource CascadeButtonStyle}"
-                                                Click="CascadeButton_Click"
-                                                Tag="{Binding}"/>
-                                    </StackPanel>
-
-                                    <!-- Row 1: グループ一括制御（透明度・サイズ） -->
-                                    <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,4,0,0">
-                                        <!-- 一括透明度スライダー -->
-                                        <TextBlock Text="Opacity:" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="0,0,4,0"/>
-                                        <Slider x:Name="GroupOpacitySlider"
-                                                Style="{StaticResource ThemedSliderStyle}"
-                                                Minimum="0" Maximum="100" 
-                                                Value="100"
-                                                Width="80"
-                                                VerticalAlignment="Center"
-                                                ValueChanged="GroupOpacitySlider_ValueChanged"
-                                                Tag="{Binding}"/>
-                                        <TextBlock Text="%" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="2,0,10,0"/>
-                                        
-                                        <!-- 一括サイズ設定 -->
-                                        <TextBlock Text="Size:" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="0,0,4,0"/>
-                                        <TextBox x:Name="GroupWidthTextBox"
-                                                 Width="45" Height="18" FontSize="10"
-                                                 Text="800"
-                                                 VerticalContentAlignment="Center"
-                                                 Background="{DynamicResource BackgroundColor}"
-                                                 Foreground="{DynamicResource ForegroundColor}"
-                                                 BorderBrush="{DynamicResource BorderColor}"
-                                                 Tag="{Binding}"/>
-                                        <TextBlock Text="x" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="2,0,2,0"/>
-                                        <TextBox x:Name="GroupHeightTextBox"
-                                                 Width="45" Height="18" FontSize="10"
-                                                 Text="600"
-                                                 VerticalContentAlignment="Center"
-                                                 Background="{DynamicResource BackgroundColor}"
-                                                 Foreground="{DynamicResource ForegroundColor}"
-                                                 BorderBrush="{DynamicResource BorderColor}"
-                                                 Tag="{Binding}"/>
-                                        <Button Content="Apply" 
-                                                FontSize="10" 
-                                                Width="40" Height="18"
-                                                Margin="4,0,0,0"
-                                                Click="GroupSizeApply_Click"
-                                                Tag="{Binding}"
-                                                ToolTip="Apply size to all windows in this group"/>
-                                    </StackPanel>
-                                </Grid>
-                            </HierarchicalDataTemplate>
-
-                            <!-- ウィンドウアイテムのテンプレート -->
-                            <DataTemplate DataType="{x:Type local:WindowInfo}">
-                                <Grid Margin="0,3" MouseMove="WindowItem_MouseMove" Tag="{Binding}">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="180"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <Border x:Name="ActiveBorder" Background="{DynamicResource AccentHighlightColor}" Opacity="0.3" CornerRadius="3" Margin="-2">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                    </Border>
-
-                                    <!-- 1行目: タイトル・不透明度・ピン/クリックスルー/連動ドラッグ -->
-                                    <Image Source="{Binding Icon}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" Grid.Column="0" Grid.Row="0"/>
-                                    
-                                    <TextBlock Grid.Column="1" Grid.Row="0" Text="{Binding Title}" 
-                                               VerticalAlignment="Center" 
-                                               TextTrimming="CharacterEllipsis" 
-                                               Foreground="{DynamicResource ForegroundColor}"
-                                               FontSize="12"/>
-
-                                    <Grid Grid.Column="2" Grid.Row="0" VerticalAlignment="Center">
-                                        <Slider Style="{StaticResource ThemedSliderStyle}"
-                                                Minimum="0" Maximum="100" 
-                                                Value="{Binding Opacity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                ValueChanged="OpacitySlider_ValueChanged"/>
-                                        <TextBlock Text="{Binding Opacity, StringFormat={}{0}%}" 
-                                                   FontSize="9"
-                                                   IsHitTestVisible="False"
-                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource MutedForegroundColor}"/>
+                            <!-- 上側: フラットなウィンドウ一覧 -->
+                            <Border Grid.Row="0" Margin="10,0,10,5" Background="{DynamicResource CardBackgroundColor}" CornerRadius="4">
+                                <DockPanel Margin="8">
+                                    <!-- ヘッダー: タイトルとフィルタ -->
+                                    <Grid DockPanel.Dock="Top" Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="All Windows"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource MutedForegroundColor}"
+                                                   VerticalAlignment="Center"
+                                                   Grid.Column="0"/>
+                                        <TextBlock Text="{Binding Windows.Count, StringFormat=({0})}"
+                                                   FontSize="10"
+                                                   Foreground="{DynamicResource MutedForegroundColor}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="4,0,0,0"
+                                                   Grid.Column="1"/>
+                                        <Grid Grid.Column="2" Width="150">
+                                            <TextBox x:Name="WindowFilterTextBox"
+                                                     Text="{Binding WindowFilterText, UpdateSourceTrigger=PropertyChanged}"
+                                                     Background="{DynamicResource BackgroundColor}"
+                                                     Foreground="{DynamicResource ForegroundColor}"
+                                                     BorderBrush="{DynamicResource BorderColor}"
+                                                     FontSize="10"
+                                                     VerticalContentAlignment="Center"
+                                                     Padding="4,2"/>
+                                            <TextBlock Text="🔍 Filter..."
+                                                       IsHitTestVisible="False"
+                                                       VerticalAlignment="Center"
+                                                       HorizontalAlignment="Left"
+                                                       Margin="6,0,0,0"
+                                                       FontSize="10"
+                                                       Foreground="{DynamicResource MutedForegroundColor}">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Text, ElementName=WindowFilterTextBox}" Value="">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Grid>
                                     </Grid>
-                                    
-                                    <ToggleButton Style="{StaticResource PinToggleButtonStyle}" 
-                                                  IsChecked="{Binding IsTopMost, Mode=OneWay}"
-                                                  Grid.Column="3" Grid.Row="0"
-                                                  ToolTip="Toggle Always on Top"
-                                                  Click="PinButton_Click"/>
+                                    <!-- 列ヘッダー -->
+                                    <Grid DockPanel.Dock="Top" Margin="0,0,0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="20"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="80"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="1" Text="Title" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource MutedForegroundColor}"/>
+                                        <TextBlock Grid.Column="2" Text="Process" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource MutedForegroundColor}" Margin="8,0,0,0"/>
+                                    </Grid>
+                                    <ListView ItemsSource="{Binding FilteredWindows}"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type local:WindowInfo}">
+                                                <Grid Margin="0,2" MouseMove="WindowItem_MouseMove" Tag="{Binding}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Image Source="{Binding Icon}" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center" Grid.Column="0"/>
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding Title}"
+                                                               VerticalAlignment="Center"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Foreground="{DynamicResource ForegroundColor}"
+                                                               FontSize="11"/>
+                                                    <TextBlock Grid.Column="2"
+                                                               Text="{Binding ProcessName}"
+                                                               Margin="8,0,0,0"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource MutedForegroundColor}"
+                                                               FontSize="10"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </DockPanel>
+                            </Border>
 
-                                    <ToggleButton Style="{StaticResource ClickThroughToggleButtonStyle}"
-                                                  IsChecked="{Binding IsClickThrough, Mode=OneWay}"
-                                                  Grid.Column="4" Grid.Row="0"
-                                                  ToolTip="Toggle Click-Through"
-                                                  Click="ClickThroughButton_Click"/>
+                            <!-- 中央: スプリッタ -->
+                            <GridSplitter Grid.Row="1"
+                                          HorizontalAlignment="Stretch"
+                                          Height="5"
+                                          Background="{DynamicResource BorderColor}"
+                                          ShowsPreview="False"/>
 
-                                    <!-- 連動ドラッグに含めるかどうかのトグル -->
-                                    <ToggleButton Style="{StaticResource WindowLinkedDragToggleButtonStyle}"
-                                                  IsChecked="{Binding IncludeInLinkedDrag, Mode=TwoWay}"
-                                                  Grid.Column="5" Grid.Row="0"
-                                                  ToolTip="Include in Linked Drag"/>
+                            <!-- 下側: 既存のグループ TreeView -->
+                            <TreeView Grid.Row="2" 
+                                      x:Name="WindowTreeView"
+                                      ItemsSource="{Binding WindowGroups}"
+                                      Background="Transparent"
+                                      BorderThickness="0"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                      SelectedItemChanged="WindowTreeView_SelectedItemChanged">
 
-                                    <!-- 2行目: サイズ調整スライダー（幅・高さ） -->
-                                    <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="5" Orientation="Horizontal" Margin="0,2,0,0">
-                                        <TextBlock Text="Size:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}" Margin="0,0,5,0" FontSize="10"/>
-                                        <TextBlock Text="W" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" Margin="0,0,3,0" FontSize="10"/>
-                                        <Slider Minimum="200" Maximum="3000"
-                                                Value="{Binding Width, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                ValueChanged="WindowWidthSlider_ValueChanged"
-                                                Width="100"/>
-                                        <TextBlock Text="H" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" Margin="10,0,3,0" FontSize="10"/>
-                                        <Slider Minimum="200" Maximum="3000"
-                                                Value="{Binding Height, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                ValueChanged="WindowHeightSlider_ValueChanged"
-                                                Width="100"/>
-                                    </StackPanel>
-                                </Grid>
-                            </DataTemplate>
-                        </TreeView.Resources>
+                                <TreeView.Resources>
+                                    <!-- グループヘッダーのテンプレート -->
+                                    <HierarchicalDataTemplate DataType="{x:Type local:WindowGroup}" ItemsSource="{Binding Windows}">
+                                        <Grid Margin="0,5" AllowDrop="True" Drop="GroupHeader_Drop" DragOver="GroupHeader_DragOver" Tag="{Binding}">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
 
-                        <TreeView.ItemContainerStyle>
-                            <Style TargetType="TreeViewItem">
-                                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
-                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                <Setter Property="Background" Value="Transparent"/>
-                                <Setter Property="Foreground" Value="{DynamicResource ForegroundColor}"/>
-                                <Setter Property="Padding" Value="2"/>
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="TreeViewItem">
-                                            <Grid>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition/>
-                                                </Grid.RowDefinitions>
-                                                <Border x:Name="Bd"
-                                                        Background="{TemplateBinding Background}"
-                                                        BorderBrush="{TemplateBinding BorderBrush}"
-                                                        BorderThickness="{TemplateBinding BorderThickness}"
-                                                        Padding="{TemplateBinding Padding}">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <ToggleButton x:Name="Expander"
-                                                                      ClickMode="Press"
-                                                                      IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
-                                                                      Style="{StaticResource ExpanderToggleButtonStyle}"
-                                                                      Width="16" Height="16"/>
-                                                        <ContentPresenter x:Name="PART_Header"
-                                                                          Grid.Column="1"
-                                                                          ContentSource="Header"
-                                                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
-                                                    </Grid>
-                                                </Border>
-                                                <ItemsPresenter x:Name="ItemsHost" Grid.Row="1" Margin="16,0,0,0"/>
+                                            <!-- Row 0: グループ名・連動ドラッグ・カスケード -->
+                                            <Image Source="{Binding GroupIcon}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" Grid.Column="0" Grid.Row="0"/>
+                                            
+                                            <TextBlock Grid.Column="1" Grid.Row="0" VerticalAlignment="Center">
+                                                <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource ForegroundColor}"/>
+                                                <Run Text=" (" Foreground="{DynamicResource MutedForegroundColor}"/>
+                                                <Run Text="{Binding WindowCount, Mode=OneWay}" Foreground="{DynamicResource MutedForegroundColor}"/>
+                                                <Run Text=")" Foreground="{DynamicResource MutedForegroundColor}"/>
+                                            </TextBlock>
+
+                                            <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal">
+                                                <!-- 連動ドラッグ有効/無効トグル -->
+                                                <ToggleButton Style="{StaticResource LinkedDragToggleButtonStyle}"
+                                                              IsChecked="{Binding LinkedDragEnabled, Mode=TwoWay}"
+                                                              ToolTip="Enable Linked Drag for this group"/>
+                                                <!-- Cascadeアイコンボタン -->
+                                                <Button Style="{StaticResource CascadeButtonStyle}"
+                                                        Click="CascadeButton_Click"
+                                                        Tag="{Binding}"/>
+                                            </StackPanel>
+
+                                            <!-- Row 1: グループ一括制御（透明度・サイズ） -->
+                                            <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,4,0,0">
+                                                <!-- 一括透明度スライダー -->
+                                                <TextBlock Text="Opacity:" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="0,0,4,0"/>
+                                                <Slider x:Name="GroupOpacitySlider"
+                                                        Style="{StaticResource ThemedSliderStyle}"
+                                                        Minimum="0" Maximum="100" 
+                                                        Value="100"
+                                                        Width="80"
+                                                        VerticalAlignment="Center"
+                                                        ValueChanged="GroupOpacitySlider_ValueChanged"
+                                                        Tag="{Binding}"/>
+                                                <TextBlock Text="%" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="2,0,10,0"/>
+                                                
+                                                <!-- 一括サイズ設定 -->
+                                                <TextBlock Text="Size:" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="0,0,4,0"/>
+                                                <TextBox x:Name="GroupWidthTextBox"
+                                                         Width="45" Height="18" FontSize="10"
+                                                         Text="800"
+                                                         VerticalContentAlignment="Center"
+                                                         Background="{DynamicResource BackgroundColor}"
+                                                         Foreground="{DynamicResource ForegroundColor}"
+                                                         BorderBrush="{DynamicResource BorderColor}"
+                                                         Tag="{Binding}"/>
+                                                <TextBlock Text="x" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="2,0,2,0"/>
+                                                <TextBox x:Name="GroupHeightTextBox"
+                                                         Width="45" Height="18" FontSize="10"
+                                                         Text="600"
+                                                         VerticalContentAlignment="Center"
+                                                         Background="{DynamicResource BackgroundColor}"
+                                                         Foreground="{DynamicResource ForegroundColor}"
+                                                         BorderBrush="{DynamicResource BorderColor}"
+                                                         Tag="{Binding}"/>
+                                                <Button Content="Apply" 
+                                                        FontSize="10" 
+                                                        Width="40" Height="18"
+                                                        Margin="4,0,0,0"
+                                                        Click="GroupSizeApply_Click"
+                                                        Tag="{Binding}"
+                                                        ToolTip="Apply size to all windows in this group"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </HierarchicalDataTemplate>
+
+                                    <!-- ウィンドウアイテムのテンプレート -->
+                                    <DataTemplate DataType="{x:Type local:WindowInfo}">
+                                        <Grid Margin="0,3" MouseMove="WindowItem_MouseMove" Tag="{Binding}">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="180"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <Border x:Name="ActiveBorder" Background="{DynamicResource AccentHighlightColor}" Opacity="0.3" CornerRadius="3" Margin="-2">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                            </Border>
+
+                                            <!-- 1行目: タイトル・不透明度・ピン/クリックスルー/連動ドラッグ -->
+                                            <Image Source="{Binding Icon}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" Grid.Column="0" Grid.Row="0"/>
+                                            
+                                            <TextBlock Grid.Column="1" Grid.Row="0" Text="{Binding Title}" 
+                                                       VerticalAlignment="Center" 
+                                                       TextTrimming="CharacterEllipsis" 
+                                                       Foreground="{DynamicResource ForegroundColor}"
+                                                       FontSize="12"/>
+
+                                            <Grid Grid.Column="2" Grid.Row="0" VerticalAlignment="Center">
+                                                <Slider Style="{StaticResource ThemedSliderStyle}"
+                                                        Minimum="0" Maximum="100" 
+                                                        Value="{Binding Opacity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                        ValueChanged="OpacitySlider_ValueChanged"/>
+                                                <TextBlock Text="{Binding Opacity, StringFormat={}{0}%}" 
+                                                           FontSize="9"
+                                                           IsHitTestVisible="False"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource MutedForegroundColor}"/>
                                             </Grid>
-                                            <ControlTemplate.Triggers>
-                                                <Trigger Property="IsExpanded" Value="false">
-                                                    <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed"/>
-                                                </Trigger>
-                                                <Trigger Property="HasItems" Value="false">
-                                                    <Setter TargetName="Expander" Property="Visibility" Value="Hidden"/>
-                                                </Trigger>
-                                                <!-- 選択時の背景色は変えず、ホバー時のみ色を付ける -->
-                                                <Trigger Property="IsSelected" Value="true">
-                                                    <Setter TargetName="Bd" Property="Background" Value="Transparent"/>
-                                                </Trigger>
-                                                <Trigger Property="IsMouseOver" Value="true">
-                                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ListItemHoverColor}"/>
-                                                </Trigger>
-                                            </ControlTemplate.Triggers>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </TreeView.ItemContainerStyle>
-                    </TreeView>
-                </Grid>
-            </TabItem>
+                                            
+                                            <ToggleButton Style="{StaticResource PinToggleButtonStyle}" 
+                                                          IsChecked="{Binding IsTopMost, Mode=OneWay}"
+                                                          Grid.Column="3" Grid.Row="0"
+                                                          ToolTip="Toggle Always on Top"
+                                                          Click="PinButton_Click"/>
+
+                                            <ToggleButton Style="{StaticResource ClickThroughToggleButtonStyle}"
+                                                          IsChecked="{Binding IsClickThrough, Mode=OneWay}"
+                                                          Grid.Column="4" Grid.Row="0"
+                                                          ToolTip="Toggle Click-Through"
+                                                          Click="ClickThroughButton_Click"/>
+
+                                            <!-- 連動ドラッグに含めるかどうかのトグル -->
+                                            <ToggleButton Style="{StaticResource WindowLinkedDragToggleButtonStyle}"
+                                                          IsChecked="{Binding IncludeInLinkedDrag, Mode=TwoWay}"
+                                                          Grid.Column="5" Grid.Row="0"
+                                                          ToolTip="Include in Linked Drag"/>
+
+                                            <!-- 2行目: サイズ調整スライダー（幅・高さ） -->
+                                            <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="5" Orientation="Horizontal" Margin="0,2,0,0">
+                                                <TextBlock Text="Size:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}" Margin="0,0,5,0" FontSize="10"/>
+                                                <TextBlock Text="W" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" Margin="0,0,3,0" FontSize="10"/>
+                                                <Slider Minimum="200" Maximum="3000"
+                                                        Value="{Binding Width, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                        ValueChanged="WindowWidthSlider_ValueChanged"
+                                                        Width="100"/>
+                                                <TextBlock Text="H" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" Margin="10,0,3,0" FontSize="10"/>
+                                                <Slider Minimum="200" Maximum="3000"
+                                                        Value="{Binding Height, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                        ValueChanged="WindowHeightSlider_ValueChanged"
+                                                        Width="100"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </TreeView.Resources>
+                                <TreeView.ItemContainerStyle>
+                                    <Style TargetType="TreeViewItem">
+                                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource ForegroundColor}"/>
+                                        <Setter Property="Padding" Value="2"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="TreeViewItem">
+                                                    <Grid>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto"/>
+                                                            <RowDefinition/>
+                                                        </Grid.RowDefinitions>
+                                                        <Border x:Name="Bd"
+                                                                Background="{TemplateBinding Background}"
+                                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                                Padding="{TemplateBinding Padding}">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <ToggleButton x:Name="Expander"
+                                                                              ClickMode="Press"
+                                                                              IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
+                                                                              Style="{StaticResource ExpanderToggleButtonStyle}"
+                                                                              Width="16" Height="16"/>
+                                                                <ContentPresenter x:Name="PART_Header"
+                                                                                  Grid.Column="1"
+                                                                                  ContentSource="Header"
+                                                                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                                                            </Grid>
+                                                        </Border>
+                                                        <ItemsPresenter x:Name="ItemsHost" Grid.Row="1" Margin="16,0,0,0"/>
+                                                    </Grid>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsExpanded" Value="false">
+                                                            <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed"/>
+                                                        </Trigger>
+                                                        <Trigger Property="HasItems" Value="false">
+                                                            <Setter TargetName="Expander" Property="Visibility" Value="Hidden"/>
+                                                        </Trigger>
+                                                        <!-- 選択時の背景色は変えず、ホバー時のみ色を付ける -->
+                                                        <Trigger Property="IsSelected" Value="true">
+                                                            <Setter TargetName="Bd" Property="Background" Value="Transparent"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsMouseOver" Value="true">
+                                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ListItemHoverColor}"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </TreeView.ItemContainerStyle>
+                            </TreeView>
+                        </Grid>
+                    </Grid>
+                </TabItem>
                 <TabItem Header="Presets" Style="{DynamicResource ThemedTabItemStyle}">
                     <Grid Margin="10">
                         <Grid.RowDefinitions>
@@ -765,6 +873,32 @@
                                              BorderBrush="{DynamicResource BorderColor}"/>
                                 </Grid>
 
+                                <!-- ターゲットフィルタ設定 -->
+                                <TextBlock Text="Target Filter (optional)" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource MutedForegroundColor}" Margin="0,10,0,5"/>
+                                <Grid Margin="0,5">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="100"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Process:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}" FontSize="11"/>
+                                    <TextBox Grid.Column="1" Text="{Binding TargetProcessName, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
+                                             Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
+                                             BorderBrush="{DynamicResource BorderColor}" FontSize="11"
+                                             ToolTip="プロセス名でフィルタ（例: notepad, chrome）。空欄の場合は全てに適用"/>
+                                </Grid>
+                                <Grid Margin="0,5">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="100"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Group ID:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}" FontSize="11"/>
+                                    <TextBox Grid.Column="1" Text="{Binding TargetGroupId, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
+                                             Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
+                                             BorderBrush="{DynamicResource BorderColor}" FontSize="11"
+                                             ToolTip="グループIDでフィルタ。空欄の場合は全てに適用"/>
+                                </Grid>
+
+                                <TextBlock Text="Window Settings" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource MutedForegroundColor}" Margin="0,10,0,5"/>
                                 <Grid Margin="0,5">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="100"/>

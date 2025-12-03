@@ -242,6 +242,65 @@ namespace WindowSlu.Services
         }
 
         /// <summary>
+        /// ウィンドウがプリセットのターゲットフィルタに一致するかチェック
+        /// </summary>
+        public bool MatchesTargetFilter(WindowPreset preset, WindowInfo window)
+        {
+            // TargetProcessName が設定されている場合、プロセス名でフィルタ
+            if (!string.IsNullOrWhiteSpace(preset.TargetProcessName))
+            {
+                if (!string.Equals(window.ProcessName, preset.TargetProcessName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// グループがプリセットのターゲットフィルタに一致するかチェック
+        /// </summary>
+        public bool MatchesTargetFilter(WindowPreset preset, WindowGroup group)
+        {
+            // TargetGroupId が設定されている場合、グループIDでフィルタ
+            if (!string.IsNullOrWhiteSpace(preset.TargetGroupId))
+            {
+                if (!string.Equals(group.Id, preset.TargetGroupId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+
+            // TargetProcessName が設定されている場合、グループのプロセス名でフィルタ
+            if (!string.IsNullOrWhiteSpace(preset.TargetProcessName))
+            {
+                if (!string.Equals(group.ProcessNameFilter, preset.TargetProcessName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// プリセットのターゲットフィルタに一致するすべてのグループに適用
+        /// </summary>
+        public int ApplyPresetWithFilter(WindowPreset preset, IEnumerable<WindowGroup> groups)
+        {
+            int appliedCount = 0;
+            foreach (var group in groups)
+            {
+                if (MatchesTargetFilter(preset, group))
+                {
+                    ApplyPresetToGroup(preset, group);
+                    appliedCount++;
+                }
+            }
+            return appliedCount;
+        }
+
+        /// <summary>
         /// 現在のウィンドウ設定からプリセットを作成
         /// </summary>
         public WindowPreset CreatePresetFromWindow(WindowInfo window, string presetName)

@@ -785,6 +785,57 @@ namespace WindowSlu
             _viewModel.StatusText = "Presets saved";
         }
 
+        // --- Layout Event Handlers ---
+        private void RestoreLayout_Click(object sender, RoutedEventArgs e)
+        {
+            if (LayoutComboBox.SelectedItem is WindowLayout layout)
+            {
+                int restoredCount = _viewModel.LayoutService.RestoreLayout(layout, _viewModel.Windows);
+                _viewModel.StatusText = $"Restored {restoredCount} windows from layout '{layout.Name}'";
+            }
+            else
+            {
+                _viewModel.StatusText = "Please select a layout to restore";
+            }
+        }
+
+        private void CaptureLayout_Click(object sender, RoutedEventArgs e)
+        {
+            string layoutName = $"Layout {_viewModel.LayoutService.Layouts.Count + 1}";
+            var layout = _viewModel.LayoutService.CaptureCurrentLayout(layoutName, _viewModel.Windows);
+            LayoutComboBox.SelectedItem = layout;
+            _viewModel.StatusText = $"Captured current layout as '{layout.Name}' with {layout.Entries.Count} windows";
+        }
+
+        private void DeleteLayout_Click(object sender, RoutedEventArgs e)
+        {
+            if (LayoutComboBox.SelectedItem is WindowLayout layout)
+            {
+                string name = layout.Name;
+                _viewModel.LayoutService.DeleteLayout(layout.Id);
+                _viewModel.StatusText = $"Deleted layout: {name}";
+            }
+        }
+
+        private void UpdateLayout_Click(object sender, RoutedEventArgs e)
+        {
+            if (LayoutComboBox.SelectedItem is WindowLayout layout)
+            {
+                _viewModel.LayoutService.UpdateLayout(layout, _viewModel.Windows);
+                _viewModel.StatusText = $"Updated layout '{layout.Name}' with current window positions";
+            }
+            else
+            {
+                _viewModel.StatusText = "Please select a layout to update";
+            }
+        }
+
+        private void SaveLayouts_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.LayoutService.SaveLayouts();
+            _viewModel.StatusText = "Layouts saved";
+        }
+
         // --- Hotkey Event Handlers ---
         private void EditHotkey_Click(object sender, RoutedEventArgs e)
         {

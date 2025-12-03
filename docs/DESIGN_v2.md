@@ -392,11 +392,11 @@ public class LinkedDragService
 - [x] ドラッグ&ドロップによるグループ間移動
 - [x] グループ一括制御（透明度スライダー、サイズ Apply）
 
-### Phase 7: 高度なプリセット機能 🚧
+### Phase 7: 高度なプリセット機能 ✅
 
-- [ ] 条件付き適用（TargetProcessName / TargetGroupId）
-- [ ] 適用対象フィルタUI
-- [ ] ショートカットキーからの即時適用
+- [x] 条件付き適用（TargetProcessName / TargetGroupId）
+- [x] 適用対象フィルタUI（グループComboBox選択）
+- [x] ショートカットキーからの即時適用（HotKeyプロパティ）
 
 ---
 

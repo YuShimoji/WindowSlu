@@ -990,6 +990,109 @@
                                 HorizontalAlignment="Right" Margin="0,10,0,0" Width="100"/>
                     </Grid>
                 </TabItem>
+                <!-- Layouts タブ -->
+                <TabItem Header="Layouts" Style="{DynamicResource ThemedTabItemStyle}">
+                    <Grid Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- レイアウト選択・操作 -->
+                        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                            <TextBlock Text="Saved Layouts" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource ForegroundColor}" Margin="0,0,0,10"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="LayoutComboBox" 
+                                          ItemsSource="{Binding LayoutService.Layouts}"
+                                          DisplayMemberPath="Name"
+                                          Grid.Column="0"
+                                          Margin="0,0,10,0"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <Button Content="Restore" Click="RestoreLayout_Click" Style="{StaticResource SettingsButtonStyle}" Width="70" ToolTip="選択したレイアウトを復元"/>
+                                    <Button Content="Capture" Click="CaptureLayout_Click" Style="{StaticResource SettingsButtonStyle}" Width="70" ToolTip="現在の配置を保存"/>
+                                    <Button Content="Delete" Click="DeleteLayout_Click" Style="{StaticResource SettingsButtonStyle}" Width="70"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- レイアウト詳細 -->
+                        <Border Grid.Row="1" Background="{DynamicResource CardBackgroundColor}" CornerRadius="4" Padding="10">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel DataContext="{Binding ElementName=LayoutComboBox, Path=SelectedItem}">
+                                    <TextBlock Text="Layout Details" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource ForegroundColor}" Margin="0,0,0,10"/>
+                                    
+                                    <Grid Margin="0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Name:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
+                                        <TextBox Grid.Column="1" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
+                                                 Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
+                                                 BorderBrush="{DynamicResource BorderColor}"/>
+                                    </Grid>
+
+                                    <Grid Margin="0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Windows:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Entries.Count, StringFormat={}{0} windows}" 
+                                                   VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" Margin="5,0"/>
+                                    </Grid>
+
+                                    <Grid Margin="0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Modified:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding ModifiedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" 
+                                                   VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" Margin="5,0"/>
+                                    </Grid>
+
+                                    <!-- ウィンドウエントリ一覧 -->
+                                    <TextBlock Text="Window Entries" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource MutedForegroundColor}" Margin="0,15,0,5"/>
+                                    <ItemsControl ItemsSource="{Binding Entries}" MaxHeight="200">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" Padding="5,3">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="100"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding ProcessName}" FontSize="10" Foreground="{DynamicResource ForegroundColor}" VerticalAlignment="Center"/>
+                                                        <TextBlock Grid.Column="1" Text="{Binding TitlePattern}" FontSize="10" Foreground="{DynamicResource MutedForegroundColor}" 
+                                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="5,0"/>
+                                                        <TextBlock Grid.Column="2" FontSize="9" Foreground="{DynamicResource MutedForegroundColor}" VerticalAlignment="Center">
+                                                            <Run Text="{Binding Width, StringFormat={}{0}}"/>
+                                                            <Run Text="x"/>
+                                                            <Run Text="{Binding Height, StringFormat={}{0}}"/>
+                                                        </TextBlock>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+
+                        <!-- 操作ボタン -->
+                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                            <Button Content="Update" Click="UpdateLayout_Click" Style="{StaticResource SettingsButtonStyle}" Width="80" ToolTip="現在の配置でレイアウトを更新"/>
+                            <Button Content="Save All" Click="SaveLayouts_Click" Style="{StaticResource SettingsButtonStyle}" Width="80"/>
+                        </StackPanel>
+                    </Grid>
+                </TabItem>
                 <TabItem Header="Settings" Style="{DynamicResource ThemedTabItemStyle}">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
                         <StackPanel>

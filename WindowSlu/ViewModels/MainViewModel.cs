@@ -19,6 +19,7 @@ namespace WindowSlu.ViewModels
         public GroupingService GroupingService { get; }
         public PresetService PresetService { get; }
         public LinkedDragService LinkedDragService { get; }
+        public LayoutService LayoutService { get; }
         public SettingsService SettingsService => _settingsService;
         private readonly MainWindow _mainWindow;
         private readonly DispatcherTimer _updateTimer;
@@ -130,6 +131,7 @@ namespace WindowSlu.ViewModels
             GroupingService = new GroupingService();
             PresetService = new PresetService(windowService, GroupingService);
             LinkedDragService = new LinkedDragService(GroupingService, windowService);
+            LayoutService = new LayoutService(windowService);
             _mainWindow = mainWindow;
 
             _updateTimer = new DispatcherTimer

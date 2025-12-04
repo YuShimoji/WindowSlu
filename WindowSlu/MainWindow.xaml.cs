@@ -9,6 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using System.Windows.Media;
 using WindowSlu.Models;
 using WindowSlu.Services;
 using WindowSlu.ViewModels;
@@ -571,6 +572,19 @@ namespace WindowSlu
             }
         }
 
+        private void GroupResetOpacity_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && button.Tag is WindowGroup group)
+            {
+                foreach (var window in group.Windows)
+                {
+                    SetTransparency(window.Handle, 100);
+                    window.Opacity = 100;
+                }
+                _viewModel.StatusText = $"Set group '{group.Name}' windows to 100% opacity";
+            }
+        }
+
         private void GroupSizeApply_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button button && button.Tag is WindowGroup group)
@@ -618,6 +632,19 @@ namespace WindowSlu
         {
             if (e.LeftButton == MouseButtonState.Pressed && sender is Grid grid && grid.Tag is WindowInfo windowInfo)
             {
+                // スライダーやToggleButton上ではD&Dを開始しない
+                var source = e.OriginalSource as DependencyObject;
+                while (source != null && source != grid)
+                {
+                    if (source is Slider || source is System.Windows.Controls.Primitives.ToggleButton || 
+                        source is System.Windows.Controls.Primitives.Thumb || source is Button ||
+                        source is TextBox)
+                    {
+                        return; // コントロール操作中はD&Dしない
+                    }
+                    source = VisualTreeHelper.GetParent(source);
+                }
+                
                 DragDrop.DoDragDrop(grid, windowInfo, DragDropEffects.Move);
             }
         }

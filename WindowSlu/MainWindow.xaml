@@ -155,14 +155,27 @@
             <Setter Property="Padding" Value="5"/>
             <Setter Property="FontWeight" Value="Normal"/>
             <Setter Property="Foreground" Value="{DynamicResource MutedForegroundColor}"/>
+            <Setter Property="MinWidth" Value="28"/>
+            <Setter Property="MinHeight" Value="24"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Border Background="{TemplateBinding Background}"
+                        <Border x:Name="Bd" 
+                                Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}">
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3"
+                                Padding="2">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ListItemSelectedColor}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HighlightColor}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -181,10 +194,10 @@
             <Setter Property="Content" Value="📌"/>
             <Setter Property="FontFamily" Value="Segoe UI Emoji"/>
             <Setter Property="Foreground" Value="{DynamicResource MutedForegroundColor}"/>
+            <Setter Property="ToolTip" Value="Toggle Always on Top"/>
             <Style.Triggers>
                 <Trigger Property="IsChecked" Value="True">
                     <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
-                    <Setter Property="FontWeight" Value="Bold"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -195,10 +208,10 @@
             <Setter Property="FontFamily" Value="Segoe UI Emoji"/>
             <Setter Property="FontSize" Value="16"/>
             <Setter Property="Foreground" Value="{DynamicResource MutedForegroundColor}"/>
+            <Setter Property="ToolTip" Value="Toggle Click-Through"/>
             <Style.Triggers>
                 <Trigger Property="IsChecked" Value="True">
                     <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
-                    <Setter Property="Background" Value="{DynamicResource ListItemSelectedColor}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -224,11 +237,27 @@
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="ToolTip" Value="Include in Linked Drag"/>
             <Setter Property="Foreground" Value="{DynamicResource MutedForegroundColor}"/>
-            <Setter Property="Opacity" Value="0.7"/>
             <Style.Triggers>
                 <Trigger Property="IsChecked" Value="True">
                     <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
-                    <Setter Property="Opacity" Value="1"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Reset Opacity Button Style -->
+        <Style x:Key="ResetOpacityButtonStyle" TargetType="Button" BasedOn="{StaticResource TitleBarButtonStyle}">
+            <Setter Property="Content" Value="100%"/>
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="ToolTip" Value="Reset opacity to 100%"/>
+            <Setter Property="Foreground" Value="{DynamicResource MutedForegroundColor}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource HighlightColor}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -605,37 +634,44 @@
                                 <TreeView.Resources>
                                     <!-- グループヘッダーのテンプレート -->
                                     <HierarchicalDataTemplate DataType="{x:Type local:WindowGroup}" ItemsSource="{Binding Windows}">
-                                        <Grid Margin="0,5" AllowDrop="True" Drop="GroupHeader_Drop" DragOver="GroupHeader_DragOver" Tag="{Binding}">
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                            </Grid.RowDefinitions>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
+                                        <Border Background="{DynamicResource CardBackgroundColor}" 
+                                                BorderBrush="{DynamicResource BorderColor}" 
+                                                BorderThickness="0,0,0,2" 
+                                                CornerRadius="4" 
+                                                Padding="8,6" 
+                                                Margin="0,4,0,2"
+                                                AllowDrop="True" Drop="GroupHeader_Drop" DragOver="GroupHeader_DragOver" Tag="{Binding}">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
 
-                                            <!-- Row 0: グループ名・連動ドラッグ・カスケード -->
-                                            <Image Source="{Binding GroupIcon}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" Grid.Column="0" Grid.Row="0"/>
-                                            
-                                            <TextBlock Grid.Column="1" Grid.Row="0" VerticalAlignment="Center">
-                                                <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource ForegroundColor}"/>
-                                                <Run Text=" (" Foreground="{DynamicResource MutedForegroundColor}"/>
-                                                <Run Text="{Binding WindowCount, Mode=OneWay}" Foreground="{DynamicResource MutedForegroundColor}"/>
-                                                <Run Text=")" Foreground="{DynamicResource MutedForegroundColor}"/>
-                                            </TextBlock>
+                                                <!-- Row 0: グループ名・連動ドラッグ・カスケード -->
+                                                <Image Source="{Binding GroupIcon}" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center" Grid.Column="0" Grid.Row="0"/>
+                                                
+                                                <TextBlock Grid.Column="1" Grid.Row="0" VerticalAlignment="Center">
+                                                    <Run Text="{Binding Name, Mode=OneWay}" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource ForegroundColor}"/>
+                                                    <Run Text=" (" Foreground="{DynamicResource MutedForegroundColor}"/>
+                                                    <Run Text="{Binding WindowCount, Mode=OneWay}" Foreground="{DynamicResource MutedForegroundColor}"/>
+                                                    <Run Text=")" Foreground="{DynamicResource MutedForegroundColor}"/>
+                                                </TextBlock>
 
-                                            <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal">
-                                                <!-- 連動ドラッグ有効/無効トグル -->
-                                                <ToggleButton Style="{StaticResource LinkedDragToggleButtonStyle}"
-                                                              IsChecked="{Binding LinkedDragEnabled, Mode=TwoWay}"
-                                                              ToolTip="Enable Linked Drag for this group"/>
-                                                <!-- Cascadeアイコンボタン -->
-                                                <Button Style="{StaticResource CascadeButtonStyle}"
-                                                        Click="CascadeButton_Click"
-                                                        Tag="{Binding}"/>
-                                            </StackPanel>
+                                                <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal">
+                                                    <!-- 連動ドラッグ有効/無効トグル -->
+                                                    <ToggleButton Style="{StaticResource LinkedDragToggleButtonStyle}"
+                                                                  IsChecked="{Binding LinkedDragEnabled, Mode=TwoWay}"
+                                                                  ToolTip="Enable Linked Drag for this group"/>
+                                                    <!-- Cascadeアイコンボタン -->
+                                                    <Button Style="{StaticResource CascadeButtonStyle}"
+                                                            Click="CascadeButton_Click"
+                                                            Tag="{Binding}"/>
+                                                </StackPanel>
 
                                             <!-- Row 1: グループ一括制御（透明度・サイズ） -->
                                             <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,4,0,0">
@@ -649,7 +685,11 @@
                                                         VerticalAlignment="Center"
                                                         ValueChanged="GroupOpacitySlider_ValueChanged"
                                                         Tag="{Binding}"/>
-                                                <TextBlock Text="%" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="2,0,10,0"/>
+                                                <TextBlock Text="%" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="2,0,4,0"/>
+                                                <Button Style="{StaticResource ResetOpacityButtonStyle}"
+                                                        Click="GroupResetOpacity_Click"
+                                                        Tag="{Binding}"
+                                                        Margin="0,0,10,0"/>
                                                 
                                                 <!-- 一括サイズ設定 -->
                                                 <TextBlock Text="Size:" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="0,0,4,0"/>
@@ -677,8 +717,9 @@
                                                         Click="GroupSizeApply_Click"
                                                         Tag="{Binding}"
                                                         ToolTip="Apply size to all windows in this group"/>
-                                            </StackPanel>
-                                        </Grid>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
                                     </HierarchicalDataTemplate>
 
                                     <!-- ウィンドウアイテムのテンプレート -->

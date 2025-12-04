@@ -248,4 +248,8 @@ bitbucket-pipelines.yml
 # Ignore specific settings files created by the application
 settings.json
 *.log
-debug_output.log 
+debug_output.log
+
+# Release packages
+*.zip
+**/publish/

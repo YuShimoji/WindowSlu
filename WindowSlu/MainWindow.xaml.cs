@@ -328,12 +328,44 @@ namespace WindowSlu
                 if (MyNotifyIcon != null)
                 {
                     _contextMenu = new ContextMenu();
-                    _showMenuItem = new MenuItem { Header = "Show" };
+                    
+                    // Show
+                    _showMenuItem = new MenuItem { Header = "Show WindowSlu" };
                     _showMenuItem.Click += ShowMenuItem_Click;
+                    _contextMenu.Items.Add(_showMenuItem);
+                    
+                    _contextMenu.Items.Add(new Separator());
+                    
+                    // Quick Opacity
+                    var opacityMenu = new MenuItem { Header = "Set All Opacity" };
+                    var opacity100 = new MenuItem { Header = "100% (Opaque)" };
+                    opacity100.Click += (s, e) => SetAllWindowsOpacity(100);
+                    var opacity80 = new MenuItem { Header = "80%" };
+                    opacity80.Click += (s, e) => SetAllWindowsOpacity(80);
+                    var opacity50 = new MenuItem { Header = "50%" };
+                    opacity50.Click += (s, e) => SetAllWindowsOpacity(50);
+                    opacityMenu.Items.Add(opacity100);
+                    opacityMenu.Items.Add(opacity80);
+                    opacityMenu.Items.Add(opacity50);
+                    _contextMenu.Items.Add(opacityMenu);
+                    
+                    // Presets submenu (dynamically populated)
+                    var presetsMenu = new MenuItem { Header = "Apply Preset" };
+                    presetsMenu.SubmenuOpened += (s, e) => RefreshPresetsSubmenu(presetsMenu);
+                    _contextMenu.Items.Add(presetsMenu);
+                    
+                    // Layouts submenu (dynamically populated)
+                    var layoutsMenu = new MenuItem { Header = "Restore Layout" };
+                    layoutsMenu.SubmenuOpened += (s, e) => RefreshLayoutsSubmenu(layoutsMenu);
+                    _contextMenu.Items.Add(layoutsMenu);
+                    
+                    _contextMenu.Items.Add(new Separator());
+                    
+                    // Exit
                     _exitMenuItem = new MenuItem { Header = "Exit" };
                     _exitMenuItem.Click += ExitMenuItem_Click;
-                    _contextMenu.Items.Add(_showMenuItem);
                     _contextMenu.Items.Add(_exitMenuItem);
+                    
                     MyNotifyIcon.ContextMenu = _contextMenu;
                 }
             }
@@ -689,6 +721,65 @@ namespace WindowSlu
         private void NotifyIcon_DoubleClick(object sender, RoutedEventArgs e) { ShowWindow(); }
         private void ShowMenuItem_Click(object sender, RoutedEventArgs e) { ShowWindow(); }
         private void ExitMenuItem_Click(object sender, RoutedEventArgs e) { Close(); }
+
+        private void SetAllWindowsOpacity(int opacity)
+        {
+            foreach (var window in _viewModel.Windows)
+            {
+                SetTransparency(window.Handle, opacity);
+                window.Opacity = opacity;
+            }
+            _viewModel.StatusText = $"Set all windows to {opacity}% opacity";
+        }
+
+        private void RefreshPresetsSubmenu(MenuItem presetsMenu)
+        {
+            presetsMenu.Items.Clear();
+            if (_viewModel.PresetService.Presets.Count == 0)
+            {
+                presetsMenu.Items.Add(new MenuItem { Header = "(No presets)", IsEnabled = false });
+                return;
+            }
+            foreach (var preset in _viewModel.PresetService.Presets)
+            {
+                var item = new MenuItem { Header = preset.Name, Tag = preset };
+                item.Click += (s, e) =>
+                {
+                    if (s is MenuItem mi && mi.Tag is WindowPreset p)
+                    {
+                        foreach (var group in _viewModel.WindowGroups)
+                        {
+                            _viewModel.PresetService.ApplyPresetToGroup(p, group);
+                        }
+                        _viewModel.StatusText = $"Applied preset '{p.Name}' to all windows";
+                    }
+                };
+                presetsMenu.Items.Add(item);
+            }
+        }
+
+        private void RefreshLayoutsSubmenu(MenuItem layoutsMenu)
+        {
+            layoutsMenu.Items.Clear();
+            if (_viewModel.LayoutService.Layouts.Count == 0)
+            {
+                layoutsMenu.Items.Add(new MenuItem { Header = "(No layouts)", IsEnabled = false });
+                return;
+            }
+            foreach (var layout in _viewModel.LayoutService.Layouts)
+            {
+                var item = new MenuItem { Header = layout.Name, Tag = layout };
+                item.Click += (s, e) =>
+                {
+                    if (s is MenuItem mi && mi.Tag is WindowLayout l)
+                    {
+                        int restoredCount = _viewModel.LayoutService.RestoreLayout(l, _viewModel.Windows);
+                        _viewModel.StatusText = $"Restored {restoredCount} windows from layout '{l.Name}'";
+                    }
+                };
+                layoutsMenu.Items.Add(item);
+            }
+        }
 
         private void LightTheme_Click(object sender, RoutedEventArgs e)
         {

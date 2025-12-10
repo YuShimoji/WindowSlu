@@ -1,0 +1,42 @@
+name: Build and Release WindowSlu
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Restore and Publish
+        working-directory: WindowSlu/WindowSlu
+        run: |
+          dotnet publish -c Release -r win-x64 --self-contained false
+
+      - name: Create zip package
+        shell: pwsh
+        working-directory: WindowSlu/WindowSlu
+        run: |
+          $publishPath = "bin/Release/net9.0-windows/win-x64/publish"
+          $version = $env:GITHUB_REF_NAME
+          $zipName = "WindowSlu-$version-win-x64.zip"
+          Compress-Archive -Path "$publishPath/*" -DestinationPath "../$zipName" -Force
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            WindowSlu-*-win-x64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

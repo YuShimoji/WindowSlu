@@ -266,13 +266,4 @@ namespace WindowSlu.Models
         public List<ManualGroupData> ManualGroups { get; set; } = new List<ManualGroupData>();
     }
 
-    /// <summary>
-    /// 手動グループの保存データ
-    /// </summary>
-    public class ManualGroupData
-    {
-        public string Id { get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
-        public List<string> ProcessNames { get; set; } = new List<string>();
-    }
 }

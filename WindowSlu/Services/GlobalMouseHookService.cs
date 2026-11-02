@@ -17,8 +17,6 @@ namespace WindowSlu.Services
 
         private IntPtr _hookID = IntPtr.Zero;
         private readonly LowLevelMouseProc _proc; // Keep a reference to prevent GC
-        private DateTime _lastWheelEventTime = DateTime.MinValue;
-        private const int MIN_WHEEL_EVENT_INTERVAL_MS = 50; // 最小イベント間隔（ミリ秒）
 
         public event EventHandler<GlobalMouseWheelEventArgs>? GlobalMouseWheelEvent;
 
@@ -70,30 +68,14 @@ namespace WindowSlu.Services
                 // Ctrlキーが押されている場合のみ処理
                 if (ctrlPressed)
                 {
-                    var now = DateTime.Now;
-                    if ((now - _lastWheelEventTime).TotalMilliseconds >= MIN_WHEEL_EVENT_INTERVAL_MS)
-                    {
-                        _lastWheelEventTime = now;
-                        
-                    MSLLHOOKSTRUCT hookStruct = (MSLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(MSLLHOOKSTRUCT))!;
+                    var hookStruct = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
                     int wheelDelta = (short)((hookStruct.mouseData >> 16) & 0xFFFF);
-                    IntPtr windowHandle = WindowFromPoint(hookStruct.pt);
-                    
-                        var args = new GlobalMouseWheelEventArgs(windowHandle, wheelDelta);
-                        GlobalMouseWheelEvent?.Invoke(this, args);
-                        
-                        if (args.Handled)
-                        {
-                            // To prevent the message from being passed to other applications (e.g., zooming),
-                            // we return a non-zero value.
-                            return (IntPtr)1;
-                        }
-                    }
-                    else
-                    {
-                        // イベントの間隔が短すぎる場合は処理をスキップ
-                    return (IntPtr)1; 
-                    }
+                    IntPtr child = WindowFromPoint(hookStruct.pt);
+                    IntPtr windowHandle = GetAncestor(child, 2); // GA_ROOT: match the managed top-level window list.
+                    var args = new GlobalMouseWheelEventArgs(windowHandle, wheelDelta);
+                    GlobalMouseWheelEvent?.Invoke(this, args);
+                    // Disabled or unmanaged targets always keep their own wheel behavior.
+                    if (args.Handled) return (IntPtr)1;
                 }
             }
             return CallNextHookEx(_hookID, nCode, wParam, lParam);
@@ -114,6 +96,9 @@ namespace WindowSlu.Services
 
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern IntPtr GetModuleHandle(string lpModuleName);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetAncestor(IntPtr window, uint flags);
 
         [DllImport("user32.dll")]
         static extern IntPtr WindowFromPoint(POINT Point);

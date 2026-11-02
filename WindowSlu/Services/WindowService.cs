@@ -123,6 +123,7 @@ namespace WindowSlu.Services
         private const int WS_EX_NOTOPMOST = 0x00000002;
         private const int SWP_NOMOVE = 0x0002;
         private const int SWP_NOSIZE = 0x0001;
+        private const int SWP_NOACTIVATE = 0x0010;
         private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
         private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
         private const int WS_EX_LAYERED = 0x00080000;
@@ -205,7 +206,7 @@ namespace WindowSlu.Services
             return windows;
         }
         
-        public int GetTransparency(IntPtr hWnd)
+        public virtual int GetTransparency(IntPtr hWnd)
         {
             int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
             if ((exStyle & WS_EX_LAYERED) == 0)
@@ -222,48 +223,32 @@ namespace WindowSlu.Services
             return (int)Math.Round(alpha / 2.55);
         }
 
-        public void SetTransparency(IntPtr hWnd, int percent)
+        public virtual bool SetTransparency(IntPtr hWnd, int percent)
         {
-            if (hWnd == IntPtr.Zero) return;
-            LoggingService.LogInfo($"Attempting to set transparency for window {hWnd} to {percent}%.");
-
-            int currentStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
-            if ((currentStyle & WS_EX_LAYERED) == 0)
+            if (hWnd == IntPtr.Zero || percent < 0 || percent > 100) return false;
+            int style = GetWindowLong(hWnd, GWL_EXSTYLE);
+            if ((style & WS_EX_LAYERED) == 0)
             {
-                LoggingService.LogInfo($"Window {hWnd} is not layered. Applying WS_EX_LAYERED style.");
-                SetWindowLong(hWnd, GWL_EXSTYLE, currentStyle | WS_EX_LAYERED);
+                SetWindowLong(hWnd, GWL_EXSTYLE, style | WS_EX_LAYERED);
+                if ((GetWindowLong(hWnd, GWL_EXSTYLE) & WS_EX_LAYERED) == 0) return false;
             }
-
-            byte alpha = (byte)(percent * 2.55);
-            if (!SetLayeredWindowAttributes(hWnd, 0, alpha, LWA_ALPHA))
-            {
-                 LoggingService.LogError($"Failed to set layered window attributes for window {hWnd}. Win32Error: {Marshal.GetLastWin32Error()}");
-            }
-            else
-            {
-                LoggingService.LogInfo($"Successfully set transparency for window {hWnd} to {percent}%.");
-            }
-        }
-        
-        public void ToggleTopMost(IntPtr hWnd)
-        {
-            if (hWnd == IntPtr.Zero) return;
-            LoggingService.LogInfo($"ToggleTopMost called for window handle: {hWnd}");
-
-            var currentStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
-            bool isTopMost = (currentStyle & WS_EX_TOPMOST) != 0;
-
-            IntPtr newHwnd = isTopMost ? HWND_NOTOPMOST : HWND_TOPMOST;
-            string newStatus = isTopMost ? "NOT TOPMOST" : "TOPMOST";
-            LoggingService.LogInfo($"Setting window {hWnd} to {newStatus}.");
-
-            if (!SetWindowPos(hWnd, newHwnd, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE))
-            {
-                LoggingService.LogError($"SetWindowPos failed for window {hWnd}. Win32Error: {Marshal.GetLastWin32Error()}");
-            }
+            bool success = SetLayeredWindowAttributes(hWnd, 0, (byte)Math.Round(percent * 255.0 / 100), LWA_ALPHA);
+            if (!success) LoggingService.LogError($"Transparency failed: {Marshal.GetLastWin32Error()}");
+            return success;
         }
 
-        public bool IsTopMost(IntPtr hWnd)
+        public virtual bool SetTopMost(IntPtr hWnd, bool enabled)
+        {
+            if (hWnd == IntPtr.Zero) return false;
+            bool success = SetWindowPos(hWnd, enabled ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            bool applied = success && IsTopMost(hWnd) == enabled;
+            if (!applied) LoggingService.LogError($"TopMost was not applied: {Marshal.GetLastWin32Error()}");
+            return applied;
+        }
+
+        public bool ToggleTopMost(IntPtr hWnd) => SetTopMost(hWnd, !IsTopMost(hWnd));
+
+        public virtual bool IsTopMost(IntPtr hWnd)
         {
             if (hWnd == IntPtr.Zero) return false;
             return (GetWindowLong(hWnd, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0;
@@ -306,7 +291,7 @@ namespace WindowSlu.Services
             }
         }
 
-        public bool IsClickThrough(IntPtr hWnd)
+        public virtual bool IsClickThrough(IntPtr hWnd)
         {
             if (hWnd == IntPtr.Zero) return false;
             return (GetWindowLong(hWnd, GWL_EXSTYLE) & 0x20) != 0; // WS_EX_TRANSPARENT
@@ -339,7 +324,7 @@ namespace WindowSlu.Services
         /// </summary>
         /// <param name="hWnd">ウィンドウハンドル</param>
         /// <returns>位置とサイズを含むRECT構造体</returns>
-        public RECT GetWindowPosition(IntPtr hWnd)
+        public virtual RECT GetWindowPosition(IntPtr hWnd)
         {
             RECT rect = new RECT();
             if (hWnd != IntPtr.Zero)
@@ -357,15 +342,12 @@ namespace WindowSlu.Services
         /// <param name="y">Y座標</param>
         /// <param name="width">幅</param>
         /// <param name="height">高さ</param>
-        public void SetWindowPosition(IntPtr hWnd, int x, int y, int width, int height)
+        public virtual bool SetWindowPosition(IntPtr hWnd, int x, int y, int width, int height)
         {
-            if (hWnd == IntPtr.Zero) return;
-            LoggingService.LogInfo($"Setting window {hWnd} position to ({x}, {y}) size ({width}x{height})");
-            
-            if (!MoveWindow(hWnd, x, y, width, height, true))
-            {
-                LoggingService.LogError($"MoveWindow failed for window {hWnd}. Win32Error: {Marshal.GetLastWin32Error()}");
-            }
+            if (hWnd == IntPtr.Zero || width <= 0 || height <= 0) return false;
+            bool success = MoveWindow(hWnd, x, y, width, height, true);
+            if (!success) LoggingService.LogError($"MoveWindow failed for {hWnd}: {Marshal.GetLastWin32Error()}");
+            return success;
         }
 
         /// <summary>
@@ -374,11 +356,11 @@ namespace WindowSlu.Services
         /// <param name="hWnd">ウィンドウハンドル</param>
         /// <param name="width">新しい幅</param>
         /// <param name="height">新しい高さ</param>
-        public void SetWindowSize(IntPtr hWnd, int width, int height)
+        public virtual bool SetWindowSize(IntPtr hWnd, int width, int height)
         {
-            if (hWnd == IntPtr.Zero) return;
+            if (hWnd == IntPtr.Zero) return false;
             var rect = GetWindowPosition(hWnd);
-            SetWindowPosition(hWnd, rect.Left, rect.Top, width, height);
+            return SetWindowPosition(hWnd, rect.Left, rect.Top, width, height);
         }
 
         /// <summary>
@@ -386,7 +368,7 @@ namespace WindowSlu.Services
         /// </summary>
         /// <param name="hWnd">ウィンドウハンドル</param>
         /// <returns>モニターのデバイス名</returns>
-        public string GetMonitorId(IntPtr hWnd)
+        public virtual string GetMonitorId(IntPtr hWnd)
         {
             if (hWnd == IntPtr.Zero) return string.Empty;
             
@@ -405,7 +387,7 @@ namespace WindowSlu.Services
         /// 全モニター情報を取得
         /// </summary>
         /// <returns>モニター情報のリスト</returns>
-        public List<MonitorInfo> GetAllMonitors()
+        public virtual List<MonitorInfo> GetAllMonitors()
         {
             var monitors = new List<MonitorInfo>();
             

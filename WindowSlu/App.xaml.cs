@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
@@ -35,7 +35,7 @@ namespace WindowSlu
             var themeName = theme == Theme.Light ? "LightTheme" : "DarkTheme";
             var newThemeDict = new ResourceDictionary
             {
-                Source = new Uri($"Themes/{themeName}.xaml", UriKind.Relative)
+                Source = new Uri($"/WindowSlu;component/Themes/{themeName}.xaml", UriKind.Relative)
             };
             dictionaries.Add(newThemeDict);
         }

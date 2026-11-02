@@ -1,390 +1,163 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Linq;
-using System.Text.Json;
 using WindowSlu.Models;
 
-namespace WindowSlu.Services
+namespace WindowSlu.Services;
+
+public class PresetService
 {
-    /// <summary>
-    /// プリセットの管理と適用を行うサービス
-    /// </summary>
-    public class PresetService
+    private readonly string _presetFilePath;
+    private readonly WindowService _windowService;
+    private readonly GroupingService _groupingService;
+    public ObservableCollection<WindowPreset> Presets { get; } = new();
+    public string? LastError { get; private set; }
+    public WindowOperationResult LastResult { get; private set; } = new();
+
+    public PresetService(WindowService windowService, GroupingService groupingService, string? presetFilePath = null)
     {
-        private readonly string _presetFilePath;
-        private readonly WindowService _windowService;
-        private readonly GroupingService _groupingService;
+        _windowService = windowService;
+        _groupingService = groupingService;
+        _presetFilePath = presetFilePath ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "WindowSlu", "presets.json");
+        LoadPresets();
+    }
 
-        /// <summary>
-        /// 登録されたプリセットのコレクション
-        /// </summary>
-        public ObservableCollection<WindowPreset> Presets { get; } = new ObservableCollection<WindowPreset>();
+    public void LoadPresets()
+    {
+        var data = JsonFileStore.Load<PresetData>(_presetFilePath, out var error);
+        LastError = error;
+        if (data == null) return;
+        Presets.Clear();
+        foreach (var preset in data.Presets ?? new()) Presets.Add(preset);
+        _groupingService.RestoreManualGroups(data.ManualGroups ?? new());
+    }
 
-        public PresetService(WindowService windowService, GroupingService groupingService)
+    public bool SavePresets()
+    {
+        bool saved = JsonFileStore.Save(_presetFilePath, new PresetData
         {
-            _windowService = windowService;
-            _groupingService = groupingService;
-            
-            string appDataPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "WindowSlu");
-            
-            if (!Directory.Exists(appDataPath))
+            Presets = Presets.ToList(), ManualGroups = _groupingService.GetManualGroupsData()
+        }, out var error);
+        LastError = error;
+        return saved;
+    }
+
+    public WindowPreset CreatePreset(string name)
+    {
+        var preset = new WindowPreset { Name = name, Width = 800, Height = 600, Opacity = 100, IsTopMost = false };
+        Presets.Add(preset);
+        SavePresets();
+        return preset;
+    }
+
+    public bool DeletePreset(string presetId)
+    {
+        var preset = GetPresetById(presetId);
+        if (preset == null) return false;
+        Presets.Remove(preset);
+        return SavePresets();
+    }
+
+    public void UpdatePreset(WindowPreset preset) { preset.ModifiedAt = DateTime.Now; SavePresets(); }
+    public WindowPreset? GetPresetById(string presetId) => Presets.FirstOrDefault(p => p.Id == presetId);
+
+    public bool MatchesTargetFilter(WindowPreset preset, WindowInfo window) =>
+        (string.IsNullOrWhiteSpace(preset.TargetProcessName) ||
+         string.Equals(window.ProcessName, preset.TargetProcessName, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(preset.TargetGroupId) ||
+         string.Equals(window.GroupId, preset.TargetGroupId, StringComparison.OrdinalIgnoreCase));
+
+    public bool MatchesTargetFilter(WindowPreset preset, WindowGroup group) =>
+        (string.IsNullOrWhiteSpace(preset.TargetGroupId) || string.Equals(group.Id, preset.TargetGroupId, StringComparison.OrdinalIgnoreCase)) &&
+        group.Windows.Any(w => MatchesTargetFilter(preset, w));
+
+    // Used by the Apply button, tray menu and preset hotkeys. Selection narrows, never bypasses, the filter.
+    public WindowOperationResult ApplyPreset(WindowPreset preset, IEnumerable<WindowGroup> groups,
+        WindowGroup? selectedGroup = null, WindowInfo? selectedWindow = null)
+    {
+        var result = new WindowOperationResult();
+        var seen = new HashSet<IntPtr>();
+        var targets = selectedGroup == null ? groups.ToList() : new List<WindowGroup> { selectedGroup };
+        if (selectedWindow != null)
+        {
+            if (MatchesTargetFilter(preset, selectedWindow)) ApplyWindows(preset, new[] { selectedWindow }, result, seen);
+        }
+        else
+        {
+            foreach (var group in targets)
+                ApplyWindows(preset, group.Windows.Where(w => MatchesTargetFilter(preset, w)).ToList(), result, seen);
+        }
+        if (seen.Count == 0) { result.Unmatched = 1; result.Details.Add("No windows matched the selection and target filter."); }
+        LastResult = result;
+        return result;
+    }
+
+    public void ApplyPresetToGroup(WindowPreset preset, WindowGroup group) => ApplyPreset(preset, new[] { group });
+    public void ApplyPresetToWindow(WindowPreset preset, WindowInfo window) => ApplyPreset(preset, Array.Empty<WindowGroup>(), selectedWindow: window);
+    public int ApplyPresetWithFilter(WindowPreset preset, IEnumerable<WindowGroup> groups) => ApplyPreset(preset, groups).Succeeded;
+
+    private void ApplyWindows(WindowPreset preset, IEnumerable<WindowInfo> candidates, WindowOperationResult result, HashSet<IntPtr> seen)
+    {
+        var windows = candidates.Where(w => seen.Add(w.Handle)).ToList();
+        if (windows.Count == 0) return;
+        int x = preset.CascadeStartX ?? _windowService.GetWindowPosition(windows[0].Handle).Left;
+        int y = preset.CascadeStartY ?? _windowService.GetWindowPosition(windows[0].Handle).Top;
+        foreach (var window in windows)
+        {
+            // Validate the entire request before changing this window.
+            if (preset.Width is <= 0 || preset.Height is <= 0 || preset.Opacity is < 0 or > 100)
             {
-                Directory.CreateDirectory(appDataPath);
+                result.Failed++; result.Details.Add($"Invalid dimensions or opacity: {window.Title}"); continue;
             }
-            
-            _presetFilePath = Path.Combine(appDataPath, "presets.json");
-            LoadPresets();
-        }
-
-        /// <summary>
-        /// プリセットをファイルから読み込む
-        /// </summary>
-        public void LoadPresets()
-        {
-            try
-            {
-                if (File.Exists(_presetFilePath))
-                {
-                    string json = File.ReadAllText(_presetFilePath);
-                    var data = JsonSerializer.Deserialize<PresetData>(json);
-                    
-                    if (data?.Presets != null)
-                    {
-                        Presets.Clear();
-                        foreach (var preset in data.Presets)
-                        {
-                            Presets.Add(preset);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                LoggingService.LogError($"Failed to load presets: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// プリセットをファイルに保存
-        /// </summary>
-        public void SavePresets()
-        {
-            try
-            {
-                var data = new PresetData
-                {
-                    Presets = Presets.ToList(),
-                    ManualGroups = GetManualGroupsData()
-                };
-
-                var options = new JsonSerializerOptions
-                {
-                    WriteIndented = true
-                };
-
-                string json = JsonSerializer.Serialize(data, options);
-                File.WriteAllText(_presetFilePath, json);
-            }
-            catch (Exception ex)
-            {
-                LoggingService.LogError($"Failed to save presets: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 新しいプリセットを作成
-        /// </summary>
-        public WindowPreset CreatePreset(string name)
-        {
-            var preset = new WindowPreset
-            {
-                Name = name,
-                Width = 800,
-                Height = 600,
-                Opacity = 100,
-                IsTopMost = false,
-                CreatedAt = DateTime.Now,
-                ModifiedAt = DateTime.Now
-            };
-            
-            Presets.Add(preset);
-            SavePresets();
-            return preset;
-        }
-
-        /// <summary>
-        /// プリセットを削除
-        /// </summary>
-        public bool DeletePreset(string presetId)
-        {
-            var preset = Presets.FirstOrDefault(p => p.Id == presetId);
-            if (preset != null)
-            {
-                Presets.Remove(preset);
-                SavePresets();
-                return true;
-            }
-            return false;
-        }
-
-        /// <summary>
-        /// プリセットを更新
-        /// </summary>
-        public void UpdatePreset(WindowPreset preset)
-        {
-            preset.ModifiedAt = DateTime.Now;
-            SavePresets();
-        }
-
-        /// <summary>
-        /// IDでプリセットを取得
-        /// </summary>
-        public WindowPreset? GetPresetById(string presetId)
-        {
-            return Presets.FirstOrDefault(p => p.Id == presetId);
-        }
-
-        /// <summary>
-        /// プリセットを指定のウィンドウグループに適用
-        /// </summary>
-        public void ApplyPresetToGroup(WindowPreset preset, WindowGroup group)
-        {
-            if (group.Windows.Count == 0) return;
-
-            // 開始位置を決定
-            int startX = preset.CascadeStartX ?? group.Windows[0].Left;
-            int startY = preset.CascadeStartY ?? group.Windows[0].Top;
-            int currentX = startX;
-            int currentY = startY;
-
-            // オフセット方向を決定
-            int offsetX = GetDirectionOffsetX(preset.CascadeDirection, preset.CascadeOffsetX);
-            int offsetY = GetDirectionOffsetY(preset.CascadeDirection, preset.CascadeOffsetY);
-
-            foreach (var window in group.Windows)
-            {
-                // 透明度を適用
-                if (preset.Opacity.HasValue)
-                {
-                    _windowService.SetTransparency(window.Handle, preset.Opacity.Value);
-                    window.Opacity = preset.Opacity.Value;
-                }
-
-                // TopMostを適用
-                if (preset.IsTopMost.HasValue)
-                {
-                    if (preset.IsTopMost.Value != window.IsTopMost)
-                    {
-                        _windowService.ToggleTopMost(window.Handle);
-                        window.IsTopMost = preset.IsTopMost.Value;
-                    }
-                }
-
-                // サイズと位置を適用
-                int newWidth = preset.Width ?? window.Width;
-                int newHeight = preset.Height ?? window.Height;
-
-                if (preset.EnableCascade)
-                {
-                    _windowService.SetWindowPosition(window.Handle, currentX, currentY, newWidth, newHeight);
-                    window.Left = currentX;
-                    window.Top = currentY;
-                    window.Width = newWidth;
-                    window.Height = newHeight;
-
-                    currentX += offsetX;
-                    currentY += offsetY;
-                }
-                else if (preset.Width.HasValue || preset.Height.HasValue)
-                {
-                    _windowService.SetWindowSize(window.Handle, newWidth, newHeight);
-                    window.Width = newWidth;
-                    window.Height = newHeight;
-                }
-            }
-        }
-
-        /// <summary>
-        /// プリセットを単一ウィンドウに適用
-        /// </summary>
-        public void ApplyPresetToWindow(WindowPreset preset, WindowInfo window)
-        {
-            // 透明度を適用
+            bool success = true;
             if (preset.Opacity.HasValue)
             {
-                _windowService.SetTransparency(window.Handle, preset.Opacity.Value);
-                window.Opacity = preset.Opacity.Value;
+                bool changed = _windowService.SetTransparency(window.Handle, preset.Opacity.Value);
+                success &= changed;
+                if (changed) window.Opacity = _windowService.GetTransparency(window.Handle);
             }
-
-            // TopMostを適用
             if (preset.IsTopMost.HasValue)
             {
-                if (preset.IsTopMost.Value != window.IsTopMost)
-                {
-                    _windowService.ToggleTopMost(window.Handle);
-                    window.IsTopMost = preset.IsTopMost.Value;
-                }
+                bool changed = _windowService.SetTopMost(window.Handle, preset.IsTopMost.Value);
+                success &= changed;
+                if (changed) window.IsTopMost = _windowService.IsTopMost(window.Handle);
             }
-
-            // サイズを適用
-            if (preset.Width.HasValue || preset.Height.HasValue)
+            if (preset.EnableCascade || preset.Width.HasValue || preset.Height.HasValue)
             {
-                int newWidth = preset.Width ?? window.Width;
-                int newHeight = preset.Height ?? window.Height;
-                _windowService.SetWindowSize(window.Handle, newWidth, newHeight);
-                window.Width = newWidth;
-                window.Height = newHeight;
+                var current = _windowService.GetWindowPosition(window.Handle);
+                int width = preset.Width ?? current.Width, height = preset.Height ?? current.Height;
+                bool moved = preset.EnableCascade
+                    ? _windowService.SetWindowPosition(window.Handle, x, y, width, height)
+                    : _windowService.SetWindowSize(window.Handle, width, height);
+                success &= moved;
+                if (moved) _windowService.UpdateWindowPositionInfo(window);
             }
+            if (success) result.Succeeded++;
+            else { result.Failed++; result.Details.Add($"Could not apply all settings: {window.Title}"); }
+            x += preset.CascadeDirection switch { CascadeDirection.BottomLeft or CascadeDirection.TopLeft => -preset.CascadeOffsetX, CascadeDirection.Down => 0, _ => preset.CascadeOffsetX };
+            y += preset.CascadeDirection switch { CascadeDirection.TopLeft or CascadeDirection.TopRight => -preset.CascadeOffsetY, CascadeDirection.Right => 0, _ => preset.CascadeOffsetY };
         }
+    }
 
-        /// <summary>
-        /// ウィンドウがプリセットのターゲットフィルタに一致するかチェック
-        /// </summary>
-        public bool MatchesTargetFilter(WindowPreset preset, WindowInfo window)
+    public WindowPreset CreatePresetFromWindow(WindowInfo window, string presetName)
+    {
+        _windowService.UpdateWindowPositionInfo(window);
+        var preset = new WindowPreset
         {
-            // TargetProcessName が設定されている場合、プロセス名でフィルタ
-            if (!string.IsNullOrWhiteSpace(preset.TargetProcessName))
-            {
-                if (!string.Equals(window.ProcessName, preset.TargetProcessName, StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
+            Name = presetName, TargetProcessName = window.ProcessName, Width = window.Width, Height = window.Height,
+            Opacity = _windowService.GetTransparency(window.Handle), IsTopMost = _windowService.IsTopMost(window.Handle)
+        };
+        Presets.Add(preset); SavePresets(); return preset;
+    }
 
-        /// <summary>
-        /// グループがプリセットのターゲットフィルタに一致するかチェック
-        /// </summary>
-        public bool MatchesTargetFilter(WindowPreset preset, WindowGroup group)
-        {
-            // TargetGroupId が設定されている場合、グループIDでフィルタ
-            if (!string.IsNullOrWhiteSpace(preset.TargetGroupId))
-            {
-                if (!string.Equals(group.Id, preset.TargetGroupId, StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
-            }
-
-            // TargetProcessName が設定されている場合、グループのプロセス名でフィルタ
-            if (!string.IsNullOrWhiteSpace(preset.TargetProcessName))
-            {
-                if (!string.Equals(group.ProcessNameFilter, preset.TargetProcessName, StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// プリセットのターゲットフィルタに一致するすべてのグループに適用
-        /// </summary>
-        public int ApplyPresetWithFilter(WindowPreset preset, IEnumerable<WindowGroup> groups)
-        {
-            int appliedCount = 0;
-            foreach (var group in groups)
-            {
-                if (MatchesTargetFilter(preset, group))
-                {
-                    ApplyPresetToGroup(preset, group);
-                    appliedCount++;
-                }
-            }
-            return appliedCount;
-        }
-
-        /// <summary>
-        /// 現在のウィンドウ設定からプリセットを作成
-        /// </summary>
-        public WindowPreset CreatePresetFromWindow(WindowInfo window, string presetName)
-        {
-            var preset = new WindowPreset
-            {
-                Name = presetName,
-                TargetProcessName = window.ProcessName,
-                Width = window.Width,
-                Height = window.Height,
-                Opacity = window.Opacity,
-                IsTopMost = window.IsTopMost
-            };
-
-            Presets.Add(preset);
-            SavePresets();
-            return preset;
-        }
-
-        /// <summary>
-        /// 現在のグループ設定からプリセットを作成
-        /// </summary>
-        public WindowPreset CreatePresetFromGroup(WindowGroup group, string presetName)
-        {
-            var firstWindow = group.Windows.FirstOrDefault();
-            var preset = new WindowPreset
-            {
-                Name = presetName,
-                TargetProcessName = group.ProcessNameFilter,
-                TargetGroupId = group.Id,
-                Width = firstWindow?.Width,
-                Height = firstWindow?.Height,
-                Opacity = firstWindow?.Opacity,
-                IsTopMost = firstWindow?.IsTopMost,
-                EnableCascade = true,
-                CascadeOffsetX = 30,
-                CascadeOffsetY = 30,
-                CascadeDirection = CascadeDirection.BottomRight
-            };
-
-            Presets.Add(preset);
-            SavePresets();
-            return preset;
-        }
-
-        private int GetDirectionOffsetX(CascadeDirection direction, int offset)
-        {
-            return direction switch
-            {
-                CascadeDirection.BottomRight => offset,
-                CascadeDirection.TopRight => offset,
-                CascadeDirection.BottomLeft => -offset,
-                CascadeDirection.TopLeft => -offset,
-                CascadeDirection.Right => offset,
-                CascadeDirection.Down => 0,
-                _ => offset
-            };
-        }
-
-        private int GetDirectionOffsetY(CascadeDirection direction, int offset)
-        {
-            return direction switch
-            {
-                CascadeDirection.BottomRight => offset,
-                CascadeDirection.TopRight => -offset,
-                CascadeDirection.BottomLeft => offset,
-                CascadeDirection.TopLeft => -offset,
-                CascadeDirection.Right => 0,
-                CascadeDirection.Down => offset,
-                _ => offset
-            };
-        }
-
-        private List<ManualGroupData> GetManualGroupsData()
-        {
-            return _groupingService.Groups
-                .Where(g => g.Type == GroupType.Manual)
-                .Select(g => new ManualGroupData
-                {
-                    Id = g.Id,
-                    Name = g.Name,
-                    ProcessNames = g.Windows.Select(w => w.ProcessName).Distinct().ToList()
-                })
-                .ToList();
-        }
+    public WindowPreset CreatePresetFromGroup(WindowGroup group, string presetName)
+    {
+        var window = group.Windows.FirstOrDefault();
+        if (window == null) throw new ArgumentException("The group has no windows.", nameof(group));
+        var preset = CreatePresetFromWindow(window, presetName);
+        preset.TargetProcessName = group.Type == GroupType.AutoByProcess ? group.ProcessNameFilter : null;
+        preset.TargetGroupId = group.Id;
+        preset.EnableCascade = true;
+        SavePresets(); return preset;
     }
 }

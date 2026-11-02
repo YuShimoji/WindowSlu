@@ -1,270 +1,157 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Linq;
-using System.Text.Json;
 using WindowSlu.Models;
 
-namespace WindowSlu.Services
+namespace WindowSlu.Services;
+
+public class LayoutService
 {
-    /// <summary>
-    /// ウィンドウレイアウトの保存・復元を管理するサービス
-    /// </summary>
-    public class LayoutService
+    private readonly WindowService _windowService;
+    private readonly string _layoutFilePath;
+    public ObservableCollection<WindowLayout> Layouts { get; } = new();
+    public string? LastError { get; private set; }
+    public WindowOperationResult LastRestoreResult { get; private set; } = new();
+
+    public LayoutService(WindowService windowService, string? layoutFilePath = null)
     {
-        private readonly WindowService _windowService;
-        private readonly string _layoutFilePath;
-        private static readonly JsonSerializerOptions _jsonOptions = new()
+        _windowService = windowService;
+        _layoutFilePath = layoutFilePath ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "WindowSlu", "layouts.json");
+        LoadLayouts();
+    }
+
+    public void LoadLayouts()
+    {
+        var data = JsonFileStore.Load<LayoutData>(_layoutFilePath, out var error);
+        LastError = error;
+        if (data == null) return;
+        Layouts.Clear();
+        foreach (var layout in data.Layouts ?? new()) Layouts.Add(layout);
+    }
+
+    public bool SaveLayouts()
+    {
+        bool saved = JsonFileStore.Save(_layoutFilePath, new LayoutData { Layouts = Layouts.ToList() }, out var error);
+        LastError = error; return saved;
+    }
+
+    public WindowLayout CreateLayout(string name)
+    {
+        var layout = new WindowLayout { Name = name };
+        Layouts.Add(layout); SaveLayouts(); return layout;
+    }
+
+    private List<WindowLayoutEntry> CaptureEntries(IEnumerable<WindowInfo> windows) => windows.Select(window =>
+    {
+        _windowService.UpdateWindowPositionInfo(window);
+        return new WindowLayoutEntry
         {
-            WriteIndented = true
+            ProcessName = window.ProcessName, TitlePattern = window.Title,
+            Left = window.Left, Top = window.Top, Width = window.Width, Height = window.Height,
+            Opacity = _windowService.GetTransparency(window.Handle), IsTopMost = _windowService.IsTopMost(window.Handle),
+            MonitorId = window.MonitorId
         };
+    }).ToList();
 
-        /// <summary>
-        /// 保存済みレイアウトのリスト
-        /// </summary>
-        public ObservableCollection<WindowLayout> Layouts { get; } = new ObservableCollection<WindowLayout>();
+    public WindowLayout CaptureCurrentLayout(string name, IEnumerable<WindowInfo> windows)
+    {
+        var layout = new WindowLayout { Name = name, Entries = CaptureEntries(windows) };
+        Layouts.Add(layout); SaveLayouts(); return layout;
+    }
 
-        public LayoutService(WindowService windowService)
+    public bool DeleteLayout(string layoutId)
+    {
+        var layout = Layouts.FirstOrDefault(l => l.Id == layoutId);
+        if (layout == null) return false;
+        Layouts.Remove(layout); return SaveLayouts();
+    }
+
+    public void UpdateLayout(WindowLayout layout, IEnumerable<WindowInfo> windows)
+    {
+        layout.Entries = CaptureEntries(windows);
+        layout.ModifiedAt = DateTime.Now;
+        SaveLayouts();
+    }
+
+    public int RestoreLayout(WindowLayout layout, IEnumerable<WindowInfo> currentWindows)
+    {
+        var result = new WindowOperationResult();
+        LastRestoreResult = result;
+        var available = currentWindows.GroupBy(w => w.Handle).Select(g => g.First()).ToList();
+        var assignments = new Dictionary<WindowLayoutEntry, WindowInfo>();
+        var pending = layout.Entries.Distinct().ToList();
+        var ambiguous = new HashSet<WindowLayoutEntry>();
+        void MatchStage(Func<WindowLayoutEntry, WindowInfo, bool> matches)
         {
-            _windowService = windowService;
-            _layoutFilePath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "WindowSlu",
-                "layouts.json"
-            );
-
-            LoadLayouts();
-        }
-
-        /// <summary>
-        /// レイアウトをファイルから読み込み
-        /// </summary>
-        public void LoadLayouts()
-        {
-            try
+            var candidates = pending.ToDictionary(entry => entry, entry => available.Where(w => matches(entry, w)).ToList());
+            var claimCounts = candidates.Values.SelectMany(list => list).GroupBy(w => w.Handle).ToDictionary(g => g.Key, g => g.Count());
+            var blockedHandles = new HashSet<IntPtr>();
+            foreach (var (entry, possible) in candidates)
             {
-                if (File.Exists(_layoutFilePath))
+                if (possible.Count > 1 || possible.Any(w => claimCounts[w.Handle] > 1))
                 {
-                    var json = File.ReadAllText(_layoutFilePath);
-                    var data = JsonSerializer.Deserialize<LayoutData>(json);
-                    if (data?.Layouts != null)
-                    {
-                        Layouts.Clear();
-                        foreach (var layout in data.Layouts)
-                        {
-                            Layouts.Add(layout);
-                        }
-                    }
-                    LoggingService.LogInfo($"Loaded {Layouts.Count} layouts from file.");
+                    ambiguous.Add(entry); pending.Remove(entry);
+                    foreach (var window in possible) blockedHandles.Add(window.Handle);
                 }
+                else if (possible.Count == 1)
+                { assignments[entry] = possible[0]; pending.Remove(entry); available.Remove(possible[0]); }
             }
-            catch (Exception ex)
-            {
-                LoggingService.LogError($"Failed to load layouts: {ex.Message}");
-            }
+            // Do not let a weaker match consume a window already involved in an ambiguity.
+            available.RemoveAll(w => blockedHandles.Contains(w.Handle));
         }
-
-        /// <summary>
-        /// レイアウトをファイルに保存
-        /// </summary>
-        public void SaveLayouts()
+        MatchStage((entry, w) => SameProcess(entry, w) && string.Equals(w.Title, entry.TitlePattern, StringComparison.OrdinalIgnoreCase));
+        MatchStage((entry, w) => SameProcess(entry, w) &&
+            (string.IsNullOrWhiteSpace(entry.TitlePattern) || w.Title.Contains(entry.TitlePattern, StringComparison.OrdinalIgnoreCase)));
+        MatchStage((entry, w) => SameProcess(entry, w) &&
+            layout.Entries.Count(e => string.Equals(e.ProcessName, entry.ProcessName, StringComparison.OrdinalIgnoreCase)) == 1);
+        foreach (var entry in ambiguous)
+        { result.Ambiguous++; result.Details.Add($"Ambiguous: {entry.ProcessName} / {entry.TitlePattern}"); }
+        foreach (var entry in pending)
         {
-            try
-            {
-                var directory = Path.GetDirectoryName(_layoutFilePath);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                var data = new LayoutData { Layouts = Layouts.ToList() };
-                var json = JsonSerializer.Serialize(data, _jsonOptions);
-                File.WriteAllText(_layoutFilePath, json);
-                LoggingService.LogInfo($"Saved {Layouts.Count} layouts to file.");
-            }
-            catch (Exception ex)
-            {
-                LoggingService.LogError($"Failed to save layouts: {ex.Message}");
-            }
+            if (available.Count(w => SameProcess(entry, w)) > 1)
+            { result.Ambiguous++; result.Details.Add($"Ambiguous: {entry.ProcessName} / {entry.TitlePattern}"); }
+            else { result.Unmatched++; result.Details.Add($"Not found: {entry.ProcessName} / {entry.TitlePattern}"); }
         }
-
-        /// <summary>
-        /// 新しいレイアウトを作成
-        /// </summary>
-        public WindowLayout CreateLayout(string name)
+        var monitors = _windowService.GetAllMonitors();
+        foreach (var (entry, window) in assignments)
         {
-            var layout = new WindowLayout
+            if (entry.Width <= 0 || entry.Height <= 0 || entry.Opacity is < 0 or > 100)
+            { result.Failed++; result.Details.Add($"Invalid saved dimensions or opacity: {entry.TitlePattern}"); continue; }
+            var bounds = FitToMonitor(entry, monitors);
+            bool success = _windowService.SetWindowPosition(window.Handle, bounds.Left, bounds.Top, bounds.Width, bounds.Height);
+            if (success) _windowService.UpdateWindowPositionInfo(window);
+            if (entry.Opacity.HasValue)
             {
-                Name = name,
-                CreatedAt = DateTime.Now,
-                ModifiedAt = DateTime.Now
-            };
-            Layouts.Add(layout);
-            SaveLayouts();
-            return layout;
-        }
-
-        /// <summary>
-        /// 現在のウィンドウ配置からレイアウトを作成
-        /// </summary>
-        public WindowLayout CaptureCurrentLayout(string name, IEnumerable<WindowInfo> windows)
-        {
-            var layout = new WindowLayout
-            {
-                Name = name,
-                CreatedAt = DateTime.Now,
-                ModifiedAt = DateTime.Now
-            };
-
-            foreach (var window in windows)
-            {
-                // ウィンドウの現在位置を取得
-                _windowService.UpdateWindowPositionInfo(window);
-
-                var entry = new WindowLayoutEntry
-                {
-                    ProcessName = window.ProcessName,
-                    TitlePattern = window.Title,
-                    Left = window.Left,
-                    Top = window.Top,
-                    Width = window.Width,
-                    Height = window.Height,
-                    Opacity = window.Opacity,
-                    IsTopMost = window.IsTopMost,
-                    MonitorId = window.MonitorId
-                };
-                layout.Entries.Add(entry);
+                bool changed = _windowService.SetTransparency(window.Handle, entry.Opacity.Value);
+                success &= changed;
+                if (changed) window.Opacity = _windowService.GetTransparency(window.Handle);
             }
-
-            Layouts.Add(layout);
-            SaveLayouts();
-            LoggingService.LogInfo($"Captured layout '{name}' with {layout.Entries.Count} windows.");
-            return layout;
-        }
-
-        /// <summary>
-        /// レイアウトを削除
-        /// </summary>
-        public bool DeleteLayout(string layoutId)
-        {
-            var layout = Layouts.FirstOrDefault(l => l.Id == layoutId);
-            if (layout != null)
+            if (entry.IsTopMost.HasValue)
             {
-                Layouts.Remove(layout);
-                SaveLayouts();
-                LoggingService.LogInfo($"Deleted layout: {layout.Name}");
-                return true;
+                bool changed = _windowService.SetTopMost(window.Handle, entry.IsTopMost.Value);
+                success &= changed;
+                if (changed) window.IsTopMost = _windowService.IsTopMost(window.Handle);
             }
-            return false;
+            if (success) result.Succeeded++;
+            else { result.Failed++; result.Details.Add($"Could not restore all settings: {window.Title}"); }
         }
+        return result.Succeeded;
+    }
 
-        /// <summary>
-        /// レイアウトを復元
-        /// </summary>
-        public int RestoreLayout(WindowLayout layout, IEnumerable<WindowInfo> currentWindows)
-        {
-            int restoredCount = 0;
-            var windowsList = currentWindows.ToList();
+    private static bool SameProcess(WindowLayoutEntry entry, WindowInfo window) =>
+        string.Equals(entry.ProcessName, window.ProcessName, StringComparison.OrdinalIgnoreCase);
 
-            foreach (var entry in layout.Entries)
-            {
-                // プロセス名とタイトルでウィンドウを検索
-                var matchingWindow = FindMatchingWindow(entry, windowsList);
-                if (matchingWindow != null)
-                {
-                    // 位置とサイズを復元
-                    _windowService.SetWindowPosition(
-                        matchingWindow.Handle,
-                        entry.Left,
-                        entry.Top,
-                        entry.Width,
-                        entry.Height
-                    );
-                    matchingWindow.Left = entry.Left;
-                    matchingWindow.Top = entry.Top;
-                    matchingWindow.Width = entry.Width;
-                    matchingWindow.Height = entry.Height;
-
-                    // 透明度を復元
-                    if (entry.Opacity.HasValue)
-                    {
-                        _windowService.SetTransparency(matchingWindow.Handle, entry.Opacity.Value);
-                        matchingWindow.Opacity = entry.Opacity.Value;
-                    }
-
-                    // TopMostを復元
-                    if (entry.IsTopMost.HasValue && matchingWindow.IsTopMost != entry.IsTopMost.Value)
-                    {
-                        _windowService.ToggleTopMost(matchingWindow.Handle);
-                        matchingWindow.IsTopMost = entry.IsTopMost.Value;
-                    }
-
-                    restoredCount++;
-                    LoggingService.LogInfo($"Restored window: {matchingWindow.Title} to ({entry.Left}, {entry.Top})");
-                }
-            }
-
-            LoggingService.LogInfo($"Restored {restoredCount} of {layout.Entries.Count} windows from layout '{layout.Name}'");
-            return restoredCount;
-        }
-
-        /// <summary>
-        /// レイアウトエントリに一致するウィンドウを検索
-        /// </summary>
-        private WindowInfo? FindMatchingWindow(WindowLayoutEntry entry, List<WindowInfo> windows)
-        {
-            // まずプロセス名とタイトルの完全一致を試みる
-            var exactMatch = windows.FirstOrDefault(w =>
-                string.Equals(w.ProcessName, entry.ProcessName, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(w.Title, entry.TitlePattern, StringComparison.OrdinalIgnoreCase));
-
-            if (exactMatch != null) return exactMatch;
-
-            // 次にプロセス名一致 + タイトル部分一致
-            if (!string.IsNullOrWhiteSpace(entry.TitlePattern))
-            {
-                var partialMatch = windows.FirstOrDefault(w =>
-                    string.Equals(w.ProcessName, entry.ProcessName, StringComparison.OrdinalIgnoreCase) &&
-                    (w.Title?.Contains(entry.TitlePattern, StringComparison.OrdinalIgnoreCase) ?? false));
-
-                if (partialMatch != null) return partialMatch;
-            }
-
-            // 最後にプロセス名のみで検索
-            return windows.FirstOrDefault(w =>
-                string.Equals(w.ProcessName, entry.ProcessName, StringComparison.OrdinalIgnoreCase));
-        }
-
-        /// <summary>
-        /// 現在のウィンドウ配置でレイアウトを更新
-        /// </summary>
-        public void UpdateLayout(WindowLayout layout, IEnumerable<WindowInfo> windows)
-        {
-            layout.Entries.Clear();
-
-            foreach (var window in windows)
-            {
-                _windowService.UpdateWindowPositionInfo(window);
-
-                var entry = new WindowLayoutEntry
-                {
-                    ProcessName = window.ProcessName,
-                    TitlePattern = window.Title,
-                    Left = window.Left,
-                    Top = window.Top,
-                    Width = window.Width,
-                    Height = window.Height,
-                    Opacity = window.Opacity,
-                    IsTopMost = window.IsTopMost,
-                    MonitorId = window.MonitorId
-                };
-                layout.Entries.Add(entry);
-            }
-
-            layout.ModifiedAt = DateTime.Now;
-            SaveLayouts();
-            LoggingService.LogInfo($"Updated layout '{layout.Name}' with {layout.Entries.Count} windows.");
-        }
+    public static WindowService.RECT FitToMonitor(WindowLayoutEntry entry, IReadOnlyList<MonitorInfo> monitors)
+    {
+        var monitor = monitors.FirstOrDefault(m => string.Equals(m.DeviceName, entry.MonitorId, StringComparison.OrdinalIgnoreCase))
+            ?? monitors.FirstOrDefault(m => entry.Left >= m.WorkArea.Left && entry.Left < m.WorkArea.Right && entry.Top >= m.WorkArea.Top && entry.Top < m.WorkArea.Bottom)
+            ?? monitors.FirstOrDefault(m => m.IsPrimary) ?? monitors.FirstOrDefault();
+        if (monitor == null) return new() { Left = entry.Left, Top = entry.Top, Right = entry.Left + entry.Width, Bottom = entry.Top + entry.Height };
+        var area = monitor.WorkArea;
+        int width = Math.Clamp(entry.Width, 1, Math.Max(1, area.Width));
+        int height = Math.Clamp(entry.Height, 1, Math.Max(1, area.Height));
+        int x = Math.Clamp(entry.Left, area.Left, Math.Max(area.Left, area.Right - width));
+        int y = Math.Clamp(entry.Top, area.Top, Math.Max(area.Top, area.Bottom - height));
+        return new() { Left = x, Top = y, Right = x + width, Bottom = y + height };
     }
 }

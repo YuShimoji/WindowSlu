@@ -21,7 +21,7 @@ namespace WindowSlu.Models
         private bool _linkedDragEnabled = false;
 
         /// <summary>
-        /// グループの一意識別子 (GUID)
+        /// グループの一意識別子
         /// </summary>
         public string Id
         {

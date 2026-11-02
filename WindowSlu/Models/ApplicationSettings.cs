@@ -25,6 +25,9 @@ namespace WindowSlu.Models
         [JsonPropertyName("bulk_opacity_percent")]
         public int BulkOpacityPercent { get; set; } = 80;
 
+        [JsonPropertyName("mouse_wheel_opacity_enabled")]
+        public bool MouseWheelOpacityEnabled { get; set; } = true;
+
         [JsonPropertyName("hotkeys_enabled")]
         public bool HotkeysEnabled { get; set; } = false;
 

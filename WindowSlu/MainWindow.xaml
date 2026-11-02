@@ -9,7 +9,7 @@
         xmlns:tb="http://www.hardcodet.net/taskbar"
         mc:Ignorable="d"
         Title="WindowSlu" Height="450" Width="800"
-        Icon="/Assets/WindowSlu.ico"
+        Icon="/WindowSlu;component/Assets/WindowSlu.ico"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="CanResizeWithGrip">
 
@@ -403,7 +403,7 @@
         </Style>
 
         <tb:TaskbarIcon x:Key="NotifyIcon"
-                        IconSource="/Assets/WindowSlu.ico"
+                        IconSource="/WindowSlu;component/Assets/WindowSlu.ico"
                         ToolTipText="WindowSlu"
                         TrayMouseDoubleClick="NotifyIcon_DoubleClick"
                         Visibility="Collapsed">
@@ -441,7 +441,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 
-                <Image Source="/Assets/WindowSlu.ico" Width="16" Height="16" Margin="5" Grid.Column="0"/>
+                <Image Source="/WindowSlu;component/Assets/WindowSlu.ico" Width="16" Height="16" Margin="5" Grid.Column="0"/>
                 
                 <TextBlock Grid.Column="1" 
                            Text="WindowSlu" 
@@ -623,7 +623,15 @@
                                           ShowsPreview="False"/>
 
                             <!-- 下側: 既存のグループ TreeView -->
-                            <TreeView Grid.Row="2" 
+                            <DockPanel Grid.Row="2">
+                                <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
+                                    <TextBlock Text="Group name:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBox x:Name="GroupNameTextBox" Width="140" Margin="0,0,5,0" ToolTip="Name for a new or selected manual group"/>
+                                    <Button Content="New Group" Click="NewGroup_Click" Style="{StaticResource SettingsButtonStyle}"/>
+                                    <Button Content="Rename" Click="RenameGroup_Click" Style="{StaticResource SettingsButtonStyle}"/>
+                                    <Button Content="Delete Group" Click="DeleteGroup_Click" Style="{StaticResource SettingsButtonStyle}"/>
+                                </WrapPanel>
+                            <TreeView
                                       x:Name="WindowTreeView"
                                       ItemsSource="{Binding WindowGroups}"
                                       Background="Transparent"
@@ -712,7 +720,7 @@
                                                          Tag="{Binding}"/>
                                                 <Button Content="Apply" 
                                                         FontSize="10" 
-                                                        Width="40" Height="18"
+                                                        Width="40" Height="22" Padding="2,0"
                                                         Margin="4,0,0,0"
                                                         Click="GroupSizeApply_Click"
                                                         Tag="{Binding}"
@@ -866,6 +874,7 @@
                                     </Style>
                                 </TreeView.ItemContainerStyle>
                             </TreeView>
+                            </DockPanel>
                         </Grid>
                     </Grid>
                 </TabItem>
@@ -892,6 +901,7 @@
                                           Margin="0,0,10,0"/>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                                     <Button Content="Apply" Click="ApplyPreset_Click" Style="{StaticResource SettingsButtonStyle}" Width="70"/>
+                                    <Button Content="Capture" Click="CapturePreset_Click" Style="{StaticResource SettingsButtonStyle}" Width="70" ToolTip="Capture the selected window or group from Windows"/>
                                     <Button Content="New" Click="NewPreset_Click" Style="{StaticResource SettingsButtonStyle}" Width="60"/>
                                     <Button Content="Delete" Click="DeletePreset_Click" Style="{StaticResource SettingsButtonStyle}" Width="70"/>
                                 </StackPanel>
@@ -933,7 +943,9 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Group:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}" FontSize="11"/>
-                                    <ComboBox Grid.Column="1" 
+                                    <DockPanel Grid.Column="1">
+                                    <Button DockPanel.Dock="Right" Content="Clear" Click="ClearPresetGroup_Click" Style="{StaticResource SettingsButtonStyle}" ToolTip="Remove the target group filter"/>
+                                    <ComboBox
                                               SelectedValue="{Binding TargetGroupId, Mode=TwoWay}"
                                               SelectedValuePath="Id"
                                               ItemsSource="{Binding DataContext.WindowGroups, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -945,6 +957,7 @@
                                             </DataTemplate>
                                         </ComboBox.ItemTemplate>
                                     </ComboBox>
+                                    </DockPanel>
                                 </Grid>
                                 <Grid Margin="0,5">
                                     <Grid.ColumnDefinitions>
@@ -1143,6 +1156,8 @@
                                 <Button Content="Dark" Click="DarkTheme_Click" Style="{StaticResource SettingsButtonStyle}"/>
                             </StackPanel>
 
+                            <CheckBox Content="Ctrl+MouseWheel adjusts window opacity" IsChecked="{Binding SettingsService.Settings.MouseWheelOpacityEnabled}" Foreground="{DynamicResource ForegroundColor}" Margin="0,15,0,5"/>
+                            <Button Content="Save Preferences" Click="SavePreferences_Click" Style="{StaticResource SettingsButtonStyle}" HorizontalAlignment="Left"/>
                             <TextBlock Text="Hotkeys" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource ForegroundColor}" Margin="0,20,0,10"/>
                             <CheckBox Content="Enable global hotkeys" 
                                       IsChecked="{Binding SettingsService.Settings.HotkeysEnabled}"
@@ -1181,6 +1196,18 @@
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
+                <TabItem Header="Help" Style="{DynamicResource ThemedTabItemStyle}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="15">
+                        <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource ForegroundColor}" LineHeight="22">
+                            <Run Text="Select a window or group in Windows, then use its controls or apply a preset."/><LineBreak/><LineBreak/>
+                            <Run Text="Groups: enter a name and choose New Group. The selected window is added. Drag window rows onto group headers to move them. Rename and Delete Group apply to the selected manual group."/><LineBreak/><LineBreak/>
+                            <Run Text="Presets: Capture saves current settings. Target Process and Group always limit the application, including tray menus and hotkeys. A selection narrows these filters. Save Presets saves both presets and groups."/><LineBreak/><LineBreak/>
+                            <Run Text="Layouts: Capture saves the current arrangement. Restore skips ambiguous matches and reports missing or failed windows. Hover over the status text for details."/><LineBreak/><LineBreak/>
+                            <Run Text="Shortcuts: enable Hotkeys in Settings and save. Ctrl+MouseWheel changes opacity while enabled; turn it off in Settings to use another application's zoom."/><LineBreak/><LineBreak/>
+                            <Run Text="Recovery: use the ghost toggle to disable click-through. Use 100% to make windows visible. Keep WindowSlu accessible in the taskbar or tray."/>
+                        </TextBlock>
+                    </ScrollViewer>
+                </TabItem>
                 <TabItem Header="About" Style="{DynamicResource ThemedTabItemStyle}">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
                         <StackPanel>
@@ -1209,7 +1236,7 @@
             <DockPanel Grid.Row="2" LastChildFill="True">
                 <StatusBar Background="Transparent" BorderThickness="0">
                     <StatusBarItem>
-                        <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource ForegroundColor}"/>
+                        <TextBlock Text="{Binding StatusText}" ToolTip="{Binding OperationDetails}" Foreground="{DynamicResource ForegroundColor}"/>
                     </StatusBarItem>
                 </StatusBar>
             </DockPanel>

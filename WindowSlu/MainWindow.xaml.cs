@@ -39,19 +39,24 @@ namespace WindowSlu
         private readonly MainViewModel _viewModel;
         private DispatcherTimer? _indicatorTimer;
 
-        public MainWindow()
+        private readonly bool _enableSystemHooks;
+        public MainWindow() : this(null, true) { }
+
+        public MainWindow(string? dataDirectory, bool enableSystemHooks)
         {
+            _enableSystemHooks = enableSystemHooks;
             LoggingService.LogInfo("MainWindow constructor called.");
             InitializeComponent();
             InitializeIndicatorTimer();
             
             var windowService = new WindowService();
             _themeService = new ThemeService();
-            _settingsService = new SettingsService();
-            _viewModel = new MainViewModel(_settingsService, windowService, this);
+            _settingsService = new SettingsService(dataDirectory == null ? null : System.IO.Path.Combine(dataDirectory, "settings.json"));
+            _viewModel = new MainViewModel(_settingsService, windowService, this, dataDirectory);
             this.DataContext = _viewModel;
 
-            // グローバルマウスフック（Ctrl+ホイールで透明度調整）を初期化
+            // Tests can render the UI without installing system input hooks.
+            if (enableSystemHooks)
             try
             {
                 _globalMouseHookService = new GlobalMouseHookService();
@@ -79,11 +84,8 @@ namespace WindowSlu
                                 return;
                             }
 
-                            int currentOpacity = windowInfo.Opacity;
-                            if (currentOpacity < 0 || currentOpacity > 100)
-                            {
-                                currentOpacity = _viewModel.WindowService.GetTransparency(e.WindowHandle);
-                            }
+                            if (!_settingsService.Settings.MouseWheelOpacityEnabled) return;
+                            int currentOpacity = _viewModel.WindowService.GetTransparency(e.WindowHandle);
 
                             const int step = 10;
                             int direction = e.Delta > 0 ? 1 : -1;
@@ -91,13 +93,13 @@ namespace WindowSlu
 
                             if (newOpacity == currentOpacity)
                             {
+                                e.Handled = true;
                                 return;
                             }
 
-                            _viewModel.WindowService.SetTransparency(e.WindowHandle, newOpacity);
-                            windowInfo.Opacity = newOpacity;
-                            ShowTransparencyIndicator(newOpacity);
-                            _viewModel.StatusText = $"Adjusted opacity of '{windowInfo.Title}' to {newOpacity}% via Ctrl+MouseWheel";
+                            if (!SetTransparency(e.WindowHandle, newOpacity)) return;
+                            ShowTransparencyIndicator(windowInfo.Opacity);
+                            _viewModel.StatusText = $"Opacity: {windowInfo.Opacity}% (Ctrl+MouseWheel)";
 
                             // 他アプリのズームなど既定動作を抑制
                             e.Handled = true;
@@ -186,7 +188,7 @@ namespace WindowSlu
                     {
                         int currentOpacity = _viewModel.WindowService.GetTransparency(foregroundWindow);
                         int newOpacity = Math.Min(100, currentOpacity + parameter);
-                        _viewModel.WindowService.SetTransparency(foregroundWindow, newOpacity);
+                        SetTransparency(foregroundWindow, newOpacity);
                         ShowTransparencyIndicator(newOpacity);
                         break;
                     }
@@ -194,13 +196,13 @@ namespace WindowSlu
                     {
                         int currentOpacity = _viewModel.WindowService.GetTransparency(foregroundWindow);
                         int newOpacity = Math.Max(0, currentOpacity - parameter);
-                        _viewModel.WindowService.SetTransparency(foregroundWindow, newOpacity);
+                        SetTransparency(foregroundWindow, newOpacity);
                         ShowTransparencyIndicator(newOpacity);
                         break;
                     }
                 case HotkeyAction.SetOpacity:
                     {
-                        _viewModel.WindowService.SetTransparency(foregroundWindow, parameter);
+                        SetTransparency(foregroundWindow, parameter);
                         ShowTransparencyIndicator(parameter);
                         break;
                     }
@@ -215,29 +217,7 @@ namespace WindowSlu
                     if (clickThroughInfo != null) clickThroughInfo.IsClickThrough = _viewModel.WindowService.IsClickThrough(foregroundWindow);
                     break;
                 case HotkeyAction.SetAllTo80:
-                    if (DataContext is MainViewModel viewModel)
-                    {
-                        viewModel.StatusText = "全ウィンドウの透明度を80%に設定中...";
-                        Task.Run(() =>
-                        {
-                            var windowsToChange = viewModel.Windows.ToList();
-                            foreach (var window in windowsToChange)
-                            {
-                                if (window.Handle != _hwnd)
-                                {
-                                    // Set transparency in the background
-                                    _viewModel.WindowService.SetTransparency(window.Handle, 80);
-                                    
-                                    // Update UI on the main thread
-                                    Application.Current.Dispatcher.Invoke(() => window.Opacity = 80);
-                                }
-                            }
-                            Application.Current.Dispatcher.Invoke(() =>
-                            {
-                                viewModel.StatusText = "全ウィンドウの透明度設定が完了しました。";
-                            });
-                        });
-                    }
+                    SetAllWindowsOpacity(80);
                     break;
             }
         }
@@ -248,15 +228,11 @@ namespace WindowSlu
         private void RegisterAllPresetHotkeys()
         {
             if (_hotkeyService == null) return;
-
+            var errors = _hotkeyService.LastRegistrationErrors.ToList();
             foreach (var preset in _viewModel.PresetService.Presets)
-            {
-                if (!string.IsNullOrWhiteSpace(preset.HotKey))
-                {
-                    _hotkeyService.RegisterPresetHotkey(preset.Id, preset.HotKey);
-                    LoggingService.LogInfo($"Registered hotkey '{preset.HotKey}' for preset '{preset.Name}'");
-                }
-            }
+                if (!string.IsNullOrWhiteSpace(preset.HotKey) && !_hotkeyService.RegisterPresetHotkey(preset.Id, preset.HotKey))
+                    errors.AddRange(_hotkeyService.LastRegistrationErrors);
+            _viewModel.StatusText = errors.Count == 0 ? "Hotkeys enabled" : string.Join("; ", errors);
         }
 
         /// <summary>
@@ -264,40 +240,9 @@ namespace WindowSlu
         /// </summary>
         private void HandleApplyPresetHotkey(string? presetId)
         {
-            if (string.IsNullOrWhiteSpace(presetId))
-            {
-                LoggingService.LogInfo("Preset hotkey triggered but no PresetId specified.");
-                return;
-            }
-
-            var preset = _viewModel.PresetService.GetPresetById(presetId);
-            if (preset == null)
-            {
-                LoggingService.LogInfo($"Preset with ID {presetId} not found.");
-                _viewModel.StatusText = $"Preset not found: {presetId}";
-                return;
-            }
-
-            LoggingService.LogInfo($"Applying preset '{preset.Name}' via hotkey.");
-
-            // ターゲットフィルタに基づいて適用
-            bool hasFilter = !string.IsNullOrWhiteSpace(preset.TargetProcessName) ||
-                             !string.IsNullOrWhiteSpace(preset.TargetGroupId);
-
-            if (hasFilter)
-            {
-                int appliedCount = _viewModel.PresetService.ApplyPresetWithFilter(preset, _viewModel.WindowGroups);
-                _viewModel.StatusText = $"Applied preset '{preset.Name}' to {appliedCount} groups via hotkey";
-            }
-            else
-            {
-                // 全グループに適用
-                foreach (var group in _viewModel.WindowGroups)
-                {
-                    _viewModel.PresetService.ApplyPresetToGroup(preset, group);
-                }
-                _viewModel.StatusText = $"Applied preset '{preset.Name}' to all windows via hotkey";
-            }
+            var preset = presetId == null ? null : _viewModel.PresetService.GetPresetById(presetId);
+            if (preset == null) { _viewModel.StatusText = "Preset not found"; return; }
+            ShowOperationResult($"Preset '{preset.Name}'", _viewModel.PresetService.ApplyPreset(preset, _viewModel.WindowGroups));
         }
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -308,7 +253,7 @@ namespace WindowSlu
             RestoreWindowPosition();
 
             _hwnd = new WindowInteropHelper(this).EnsureHandle();
-            if (_settingsService.Settings.HotkeysEnabled)
+            if (_enableSystemHooks && _settingsService.Settings.HotkeysEnabled)
             {
                 _hotkeyService = new HotkeyService(_hwnd, _settingsService, HandleHotkey);
                 
@@ -381,6 +326,8 @@ namespace WindowSlu
             await _viewModel.RefreshWindowList();
             _viewModel.InitializeGroups();
             _viewModel.Start();
+            var loadErrors = new[] { _settingsService.LastError, _viewModel.PresetService.LastError, _viewModel.LayoutService.LastError }.Where(error => error != null);
+            if (loadErrors.Any()) _viewModel.StatusText = string.Join("; ", loadErrors);
         }
 
         private void MainWindow_Closed(object? sender, EventArgs e)
@@ -390,34 +337,37 @@ namespace WindowSlu
             _globalMouseHookService?.Dispose();
 
             // Save window position and size
-            _settingsService.Settings.WindowLeft = this.Left;
-            _settingsService.Settings.WindowTop = this.Top;
-            _settingsService.Settings.WindowWidth = this.Width;
-            _settingsService.Settings.WindowHeight = this.Height;
+            if (double.IsFinite(this.Left)) _settingsService.Settings.WindowLeft = this.Left;
+            if (double.IsFinite(this.Top)) _settingsService.Settings.WindowTop = this.Top;
+            if (double.IsFinite(this.Width)) _settingsService.Settings.WindowWidth = this.Width;
+            if (double.IsFinite(this.Height)) _settingsService.Settings.WindowHeight = this.Height;
 
             // Save current theme
             _settingsService.Settings.Theme = _currentTheme.ToString();
             
-            _settingsService.SaveSettings();
+            if (_viewModel.PresetService.LastError == null && !_viewModel.PresetService.SavePresets())
+                MessageBox.Show(_viewModel.PresetService.LastError, "Groups save failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (!_settingsService.SaveSettings()) MessageBox.Show(_settingsService.LastError, "Settings save failed", MessageBoxButton.OK, MessageBoxImage.Warning);
 
             _viewModel.Stop();
             MyNotifyIcon?.Dispose();
         }
         
-        private void SetTransparency(IntPtr hWnd, int percent)
+        private bool SetTransparency(IntPtr hWnd, int percent)
         {
-            if (hWnd == IntPtr.Zero) return;
-            _viewModel.WindowService.SetTransparency(hWnd, percent);
-            var windowInfo = _viewModel.Windows.FirstOrDefault(w => w.Handle == hWnd);
-            if (windowInfo != null) windowInfo.Opacity = percent;
+            bool success = _viewModel.WindowService.SetTransparency(hWnd, percent);
+            var window = _viewModel.Windows.FirstOrDefault(w => w.Handle == hWnd);
+            if (window != null) window.Opacity = _viewModel.WindowService.GetTransparency(hWnd);
+            if (!success) _viewModel.StatusText = "Could not change opacity; the actual value has been reloaded.";
+            return success;
         }
 
         private void ToggleTopMost(IntPtr hWnd)
         {
-            if (hWnd == IntPtr.Zero) return;
-            _viewModel.WindowService.ToggleTopMost(hWnd);
-            var windowInfo = _viewModel.Windows.FirstOrDefault(w => w.Handle == hWnd);
-            if (windowInfo != null) windowInfo.IsTopMost = !windowInfo.IsTopMost;
+            bool success = _viewModel.WindowService.ToggleTopMost(hWnd);
+            var window = _viewModel.Windows.FirstOrDefault(w => w.Handle == hWnd);
+            if (window != null) window.IsTopMost = _viewModel.WindowService.IsTopMost(hWnd);
+            if (!success) _viewModel.StatusText = "Could not change Always on Top.";
         }
 
         /// <summary>
@@ -486,7 +436,12 @@ namespace WindowSlu
         private void MinimizeButton_Click(object sender, RoutedEventArgs e) { WindowState = WindowState.Minimized; }
         private void MaximizeButton_Click(object sender, RoutedEventArgs e) { WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized; }
         private void CloseButton_Click(object sender, RoutedEventArgs e) { Close(); }
-        private void WindowListView_SelectionChanged(object sender, SelectionChangedEventArgs e) { _selectedWindowInfo = (sender as ListView)?.SelectedItem as WindowInfo; }
+        private void WindowListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            _selectedWindowInfo = (sender as ListView)?.SelectedItem as WindowInfo;
+            _viewModel.SelectedWindow = _selectedWindowInfo;
+            if (_selectedWindowInfo != null) _viewModel.SelectedGroup = null;
+        }
         
         private void WindowTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
@@ -501,48 +456,15 @@ namespace WindowSlu
                 _selectedWindowInfo = null;
                 _viewModel.SelectedWindow = null;
                 _viewModel.SelectedGroup = group;
+                GroupNameTextBox.Text = group.Name;
             }
         }
 
         private void CascadeButton_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button button && button.Tag is WindowGroup group)
-            {
-                // 現在は簡易実装：グループ内のウィンドウをカスケード配置
-                int offsetX = 30;
-                int offsetY = 30;
-                int startX = 100;
-                int startY = 100;
-
-                // 先頭ウィンドウの位置を基準にする
-                if (group.Windows.Count > 0)
-                {
-                    var leadWindow = group.Windows[0];
-                    startX = leadWindow.Left;
-                    startY = leadWindow.Top;
-                }
-
-                int currentX = startX;
-                int currentY = startY;
-
-                foreach (var window in group.Windows)
-                {
-                    _viewModel.WindowService.SetWindowPosition(
-                        window.Handle, 
-                        currentX, 
-                        currentY, 
-                        window.Width > 0 ? window.Width : 800, 
-                        window.Height > 0 ? window.Height : 600);
-                    
-                    window.Left = currentX;
-                    window.Top = currentY;
-                    
-                    currentX += offsetX;
-                    currentY += offsetY;
-                }
-
-                _viewModel.StatusText = $"Cascaded {group.Windows.Count} windows in '{group.Name}'";
-            }
+                ShowOperationResult("Cascade", _viewModel.PresetService.ApplyPreset(
+                    new WindowPreset { EnableCascade = true }, new[] { group }));
         }
         private void PinButton_Click(object sender, RoutedEventArgs e)
         {
@@ -562,7 +484,7 @@ namespace WindowSlu
         }
         private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) 
         { 
-            if (sender is Slider slider && slider.DataContext is WindowInfo info) 
+            if (sender is Slider slider && (slider.IsMouseCaptureWithin || slider.IsKeyboardFocusWithin) && slider.DataContext is WindowInfo info)
             {
                 System.Diagnostics.Debug.WriteLine($"[DEBUG] Slider changed for '{info.Title}' to {e.NewValue}");
                 SetTransparency(info.Handle, (int)e.NewValue); 
@@ -574,8 +496,8 @@ namespace WindowSlu
             {
                 int newWidth = (int)e.NewValue;
                 int height = info.Height > 0 ? info.Height : 600;
-                _viewModel.WindowService.SetWindowSize(info.Handle, newWidth, height);
-                info.Width = newWidth;
+                if (_viewModel.WindowService.SetWindowSize(info.Handle, newWidth, height)) _viewModel.WindowService.UpdateWindowPositionInfo(info);
+                else _viewModel.StatusText = "Could not resize window.";
             }
         }
 
@@ -585,36 +507,29 @@ namespace WindowSlu
             {
                 int newHeight = (int)e.NewValue;
                 int width = info.Width > 0 ? info.Width : 800;
-                _viewModel.WindowService.SetWindowSize(info.Handle, width, newHeight);
-                info.Height = newHeight;
+                if (_viewModel.WindowService.SetWindowSize(info.Handle, width, newHeight)) _viewModel.WindowService.UpdateWindowPositionInfo(info);
+                else _viewModel.StatusText = "Could not resize window.";
             }
         }
 
         // --- Group Bulk Control Event Handlers ---
+        private void ApplyGroupOpacity(WindowGroup group, int opacity)
+        {
+            var result = new WindowOperationResult();
+            foreach (var window in group.Windows)
+                if (SetTransparency(window.Handle, opacity)) result.Succeeded++; else result.Failed++;
+            ShowOperationResult($"Group '{group.Name}' opacity", result);
+        }
+
         private void GroupOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (sender is Slider slider && slider.IsMouseCaptureWithin && slider.Tag is WindowGroup group)
-            {
-                int opacity = (int)e.NewValue;
-                foreach (var window in group.Windows)
-                {
-                    SetTransparency(window.Handle, opacity);
-                    window.Opacity = opacity;
-                }
-            }
+            if (sender is Slider slider && (slider.IsMouseCaptureWithin || slider.IsKeyboardFocusWithin) && slider.Tag is WindowGroup group)
+                ApplyGroupOpacity(group, (int)e.NewValue);
         }
 
         private void GroupResetOpacity_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button button && button.Tag is WindowGroup group)
-            {
-                foreach (var window in group.Windows)
-                {
-                    SetTransparency(window.Handle, 100);
-                    window.Opacity = 100;
-                }
-                _viewModel.StatusText = $"Set group '{group.Name}' windows to 100% opacity";
-            }
+            if (sender is Button button && button.Tag is WindowGroup group) ApplyGroupOpacity(group, 100);
         }
 
         private void GroupSizeApply_Click(object sender, RoutedEventArgs e)
@@ -643,13 +558,14 @@ namespace WindowSlu
                     }
                 }
 
-                // グループ内の全ウィンドウにサイズを適用
+                var result = new WindowOperationResult();
                 foreach (var window in group.Windows)
                 {
-                    _viewModel.WindowService.SetWindowSize(window.Handle, width, height);
-                    window.Width = width;
-                    window.Height = height;
+                    if (_viewModel.WindowService.SetWindowSize(window.Handle, width, height))
+                    { _viewModel.WindowService.UpdateWindowPositionInfo(window); result.Succeeded++; }
+                    else result.Failed++;
                 }
+                ShowOperationResult("Group resize", result);
             }
         }
 
@@ -696,21 +612,11 @@ namespace WindowSlu
 
         private void GroupHeader_Drop(object sender, DragEventArgs e)
         {
-            if (e.Data.GetDataPresent(typeof(WindowInfo)) && sender is Grid grid && grid.Tag is WindowGroup targetGroup)
+            if (e.Data.GetData(typeof(WindowInfo)) is WindowInfo window && sender is FrameworkElement element && element.Tag is WindowGroup group)
             {
-                var windowInfo = e.Data.GetData(typeof(WindowInfo)) as WindowInfo;
-                if (windowInfo != null)
-                {
-                    // 元のグループからウィンドウを削除
-                    var sourceGroup = _viewModel.WindowGroups.FirstOrDefault(g => g.Windows.Contains(windowInfo));
-                    if (sourceGroup != null && sourceGroup != targetGroup)
-                    {
-                        sourceGroup.Windows.Remove(windowInfo);
-                        targetGroup.Windows.Add(windowInfo);
-                        windowInfo.GroupId = targetGroup.Id;
-                        _viewModel.StatusText = $"Moved '{windowInfo.Title}' to group '{targetGroup.Name}'";
-                    }
-                }
+                _viewModel.GroupingService.AddToGroup(group, window);
+                _viewModel.StatusText = _viewModel.PresetService.SavePresets()
+                    ? $"Moved '{window.Title}' to '{group.Name}'" : _viewModel.PresetService.LastError!;
             }
             e.Handled = true;
         }
@@ -724,12 +630,13 @@ namespace WindowSlu
 
         private void SetAllWindowsOpacity(int opacity)
         {
-            foreach (var window in _viewModel.Windows)
+            var result = new WindowOperationResult();
+            foreach (var window in _viewModel.Windows.ToList())
             {
-                SetTransparency(window.Handle, opacity);
-                window.Opacity = opacity;
+                if (SetTransparency(window.Handle, opacity)) result.Succeeded++;
+                else result.Failed++;
             }
-            _viewModel.StatusText = $"Set all windows to {opacity}% opacity";
+            ShowOperationResult($"Opacity {opacity}%", result);
         }
 
         private void RefreshPresetsSubmenu(MenuItem presetsMenu)
@@ -747,11 +654,7 @@ namespace WindowSlu
                 {
                     if (s is MenuItem mi && mi.Tag is WindowPreset p)
                     {
-                        foreach (var group in _viewModel.WindowGroups)
-                        {
-                            _viewModel.PresetService.ApplyPresetToGroup(p, group);
-                        }
-                        _viewModel.StatusText = $"Applied preset '{p.Name}' to all windows";
+                        ShowOperationResult($"Preset '{p.Name}'", _viewModel.PresetService.ApplyPreset(p, _viewModel.WindowGroups));
                     }
                 };
                 presetsMenu.Items.Add(item);
@@ -773,8 +676,8 @@ namespace WindowSlu
                 {
                     if (s is MenuItem mi && mi.Tag is WindowLayout l)
                     {
-                        int restoredCount = _viewModel.LayoutService.RestoreLayout(l, _viewModel.Windows);
-                        _viewModel.StatusText = $"Restored {restoredCount} windows from layout '{l.Name}'";
+                        _viewModel.LayoutService.RestoreLayout(l, _viewModel.Windows);
+                        ShowOperationResult($"Layout '{l.Name}'", _viewModel.LayoutService.LastRestoreResult);
                     }
                 };
                 layoutsMenu.Items.Add(item);
@@ -797,47 +700,15 @@ namespace WindowSlu
         private void ApplyPreset_Click(object sender, RoutedEventArgs e)
         {
             if (PresetComboBox.SelectedItem is WindowPreset preset)
-            {
-                bool hasFilter = !string.IsNullOrWhiteSpace(preset.TargetProcessName) || 
-                                 !string.IsNullOrWhiteSpace(preset.TargetGroupId);
-
-                // 選択されたグループにプリセットを適用
-                if (_viewModel.SelectedGroup != null)
-                {
-                    _viewModel.PresetService.ApplyPresetToGroup(preset, _viewModel.SelectedGroup);
-                    _viewModel.StatusText = $"Applied preset '{preset.Name}' to group '{_viewModel.SelectedGroup.Name}'";
-                }
-                else if (_selectedWindowInfo != null)
-                {
-                    _viewModel.PresetService.ApplyPresetToWindow(preset, _selectedWindowInfo);
-                    _viewModel.StatusText = $"Applied preset '{preset.Name}' to window";
-                }
-                else if (hasFilter)
-                {
-                    // フィルタ条件に一致するグループにのみ適用
-                    int appliedCount = _viewModel.PresetService.ApplyPresetWithFilter(preset, _viewModel.WindowGroups);
-                    string filterDesc = !string.IsNullOrWhiteSpace(preset.TargetProcessName) 
-                        ? $"process '{preset.TargetProcessName}'" 
-                        : $"group '{preset.TargetGroupId}'";
-                    _viewModel.StatusText = $"Applied preset '{preset.Name}' to {appliedCount} groups matching {filterDesc}";
-                }
-                else
-                {
-                    // 全グループに適用
-                    foreach (var group in _viewModel.WindowGroups)
-                    {
-                        _viewModel.PresetService.ApplyPresetToGroup(preset, group);
-                    }
-                    _viewModel.StatusText = $"Applied preset '{preset.Name}' to all windows";
-                }
-            }
+                ShowOperationResult($"Preset '{preset.Name}'", _viewModel.PresetService.ApplyPreset(
+                    preset, _viewModel.WindowGroups, _viewModel.SelectedGroup, _selectedWindowInfo));
         }
 
         private void NewPreset_Click(object sender, RoutedEventArgs e)
         {
             var preset = _viewModel.PresetService.CreatePreset($"Preset {_viewModel.PresetService.Presets.Count + 1}");
             PresetComboBox.SelectedItem = preset;
-            _viewModel.StatusText = $"Created new preset: {preset.Name}";
+            _viewModel.StatusText = _viewModel.PresetService.LastError ?? $"Created new preset: {preset.Name}";
         }
 
         private void DeletePreset_Click(object sender, RoutedEventArgs e)
@@ -848,7 +719,7 @@ namespace WindowSlu
                 // ホットキーを解除
                 _hotkeyService?.UnregisterPresetHotkey(preset.Id);
                 _viewModel.PresetService.DeletePreset(preset.Id);
-                _viewModel.StatusText = $"Deleted preset: {name}";
+                _viewModel.StatusText = _viewModel.PresetService.LastError ?? $"Deleted preset: {name}";
             }
         }
 
@@ -878,7 +749,7 @@ namespace WindowSlu
             {
                 preset.HotKey = null;
                 _hotkeyService?.UnregisterPresetHotkey(preset.Id);
-                _viewModel.StatusText = $"Hotkey cleared for preset '{preset.Name}'";
+                _viewModel.StatusText = _viewModel.PresetService.SavePresets() ? "Hotkey cleared and saved" : _viewModel.PresetService.LastError!;
                 return;
             }
 
@@ -889,18 +760,35 @@ namespace WindowSlu
             if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) parts.Add("Shift");
             parts.Add(key.ToString());
 
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Windows)) parts.Insert(0, "Win");
             var hotKeyString = string.Join("+", parts);
-            preset.HotKey = hotKeyString;
+            TrySetPresetHotkey(preset, hotKeyString);
+            textBox.Text = preset.HotKey ?? string.Empty;
+        }
 
-            // ホットキーを登録
-            _hotkeyService?.RegisterPresetHotkey(preset.Id, hotKeyString);
-            _viewModel.StatusText = $"Hotkey '{hotKeyString}' set for preset '{preset.Name}'";
+        private bool TrySetPresetHotkey(WindowPreset preset, string hotkey)
+        {
+            if (_hotkeyService != null && !_hotkeyService.RegisterPresetHotkey(preset.Id, hotkey))
+            {
+                _viewModel.StatusText = string.Join("; ", _hotkeyService.LastRegistrationErrors);
+                return false;
+            }
+            preset.HotKey = hotkey;
+            bool saved = _viewModel.PresetService.SavePresets();
+            _viewModel.StatusText = saved
+                ? $"Hotkey '{hotkey}' saved" + (_hotkeyService == null ? " (enable Hotkeys in Settings to activate)" : "")
+                : _viewModel.PresetService.LastError!;
+            return saved;
+        }
+
+        private void ClearPresetGroup_Click(object sender, RoutedEventArgs e)
+        {
+            if (PresetComboBox.SelectedItem is WindowPreset preset) preset.TargetGroupId = null;
         }
 
         private void SavePresets_Click(object sender, RoutedEventArgs e)
         {
-            _viewModel.PresetService.SavePresets();
-            _viewModel.StatusText = "Presets saved";
+            _viewModel.StatusText = _viewModel.PresetService.SavePresets() ? "Presets and groups saved" : _viewModel.PresetService.LastError!;
         }
 
         // --- Layout Event Handlers ---
@@ -908,8 +796,8 @@ namespace WindowSlu
         {
             if (LayoutComboBox.SelectedItem is WindowLayout layout)
             {
-                int restoredCount = _viewModel.LayoutService.RestoreLayout(layout, _viewModel.Windows);
-                _viewModel.StatusText = $"Restored {restoredCount} windows from layout '{layout.Name}'";
+                _viewModel.LayoutService.RestoreLayout(layout, _viewModel.Windows);
+                ShowOperationResult($"Layout '{layout.Name}'", _viewModel.LayoutService.LastRestoreResult);
             }
             else
             {
@@ -922,7 +810,7 @@ namespace WindowSlu
             string layoutName = $"Layout {_viewModel.LayoutService.Layouts.Count + 1}";
             var layout = _viewModel.LayoutService.CaptureCurrentLayout(layoutName, _viewModel.Windows);
             LayoutComboBox.SelectedItem = layout;
-            _viewModel.StatusText = $"Captured current layout as '{layout.Name}' with {layout.Entries.Count} windows";
+            _viewModel.StatusText = _viewModel.LayoutService.LastError ?? $"Captured '{layout.Name}' ({layout.Entries.Count} windows)";
         }
 
         private void DeleteLayout_Click(object sender, RoutedEventArgs e)
@@ -931,7 +819,7 @@ namespace WindowSlu
             {
                 string name = layout.Name;
                 _viewModel.LayoutService.DeleteLayout(layout.Id);
-                _viewModel.StatusText = $"Deleted layout: {name}";
+                _viewModel.StatusText = _viewModel.LayoutService.LastError ?? $"Deleted layout: {name}";
             }
         }
 
@@ -940,7 +828,7 @@ namespace WindowSlu
             if (LayoutComboBox.SelectedItem is WindowLayout layout)
             {
                 _viewModel.LayoutService.UpdateLayout(layout, _viewModel.Windows);
-                _viewModel.StatusText = $"Updated layout '{layout.Name}' with current window positions";
+                _viewModel.StatusText = _viewModel.LayoutService.LastError ?? $"Updated layout '{layout.Name}'";
             }
             else
             {
@@ -950,8 +838,61 @@ namespace WindowSlu
 
         private void SaveLayouts_Click(object sender, RoutedEventArgs e)
         {
-            _viewModel.LayoutService.SaveLayouts();
-            _viewModel.StatusText = "Layouts saved";
+            _viewModel.StatusText = _viewModel.LayoutService.SaveLayouts() ? "Layouts saved" : _viewModel.LayoutService.LastError!;
+        }
+
+
+        private void ShowOperationResult(string action, WindowOperationResult result)
+        {
+            _viewModel.StatusText = $"{action}: {result.Summary}";
+            _viewModel.OperationDetails = string.Join(Environment.NewLine, result.Details);
+        }
+
+        private void NewGroup_Click(object sender, RoutedEventArgs e)
+        {
+            string name = GroupNameTextBox.Text.Trim();
+            if (name.Length == 0) { _viewModel.StatusText = "Enter a group name."; return; }
+            var windows = _selectedWindowInfo == null ? Array.Empty<WindowInfo>() : new[] { _selectedWindowInfo };
+            var group = _viewModel.GroupingService.CreateManualGroup(name, windows);
+            _viewModel.SelectedGroup = group;
+            _viewModel.SelectedWindow = null; _selectedWindowInfo = null;
+            _viewModel.StatusText = _viewModel.PresetService.SavePresets() ? $"Created group '{name}'" : _viewModel.PresetService.LastError!;
+        }
+
+        private void RenameGroup_Click(object sender, RoutedEventArgs e)
+        {
+            var group = _viewModel.SelectedGroup;
+            string name = GroupNameTextBox.Text.Trim();
+            if (group?.Type != GroupType.Manual || name.Length == 0) { _viewModel.StatusText = "Select a manual group and enter its new name."; return; }
+            _viewModel.GroupingService.RenameGroup(group, name);
+            _viewModel.StatusText = _viewModel.PresetService.SavePresets() ? $"Renamed group to '{name}'" : _viewModel.PresetService.LastError!;
+        }
+
+        private void DeleteGroup_Click(object sender, RoutedEventArgs e)
+        {
+            var group = _viewModel.SelectedGroup;
+            if (group?.Type != GroupType.Manual) { _viewModel.StatusText = "Select a manual group to delete."; return; }
+            _viewModel.GroupingService.DeleteGroup(group);
+            _viewModel.SelectedGroup = null;
+            _viewModel.GroupingService.UpdateGroups(_viewModel.Windows);
+            _viewModel.StatusText = _viewModel.PresetService.SavePresets() ? "Group deleted; windows returned to automatic groups." : _viewModel.PresetService.LastError!;
+        }
+
+        private void CapturePreset_Click(object sender, RoutedEventArgs e)
+        {
+            WindowPreset preset;
+            if (_viewModel.SelectedGroup is WindowGroup group && group.Windows.Count > 0)
+                preset = _viewModel.PresetService.CreatePresetFromGroup(group, group.Name + " preset");
+            else if (_selectedWindowInfo != null)
+                preset = _viewModel.PresetService.CreatePresetFromWindow(_selectedWindowInfo, _selectedWindowInfo.ProcessName + " preset");
+            else { _viewModel.StatusText = "Select a window or non-empty group in Windows first."; return; }
+            PresetComboBox.SelectedItem = preset;
+            _viewModel.StatusText = _viewModel.PresetService.LastError ?? $"Captured preset '{preset.Name}'";
+        }
+
+        private void SavePreferences_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.StatusText = _settingsService.SaveSettings() ? "Preferences saved" : _settingsService.LastError!;
         }
 
         // --- Hotkey Event Handlers ---
@@ -1050,93 +991,50 @@ namespace WindowSlu
 
         private void SaveHotkeys_Click(object sender, RoutedEventArgs e)
         {
-            // 設定を保存
-            _viewModel.SettingsService.SaveSettings();
-
-            // フラグに応じてホットキーを有効化 / 無効化
-            if (_viewModel.SettingsService.Settings.HotkeysEnabled)
+            HotkeySettingsList.Items.Refresh();
+            if (!_settingsService.SaveSettings()) { _viewModel.StatusText = _settingsService.LastError!; return; }
+            if (_enableSystemHooks && _settingsService.Settings.HotkeysEnabled)
             {
                 if (_hotkeyService == null)
                 {
                     _hotkeyService = new HotkeyService(_hwnd, _settingsService, HandleHotkey);
+                    RegisterAllPresetHotkeys();
                 }
                 else
                 {
                     _hotkeyService.ReloadSettings();
+                    _viewModel.StatusText = _hotkeyService.LastRegistrationErrors.Count == 0
+                        ? "Hotkeys enabled and saved" : string.Join("; ", _hotkeyService.LastRegistrationErrors);
                 }
-
-                _viewModel.StatusText = "Hotkeys enabled and saved";
             }
             else
             {
-                _hotkeyService?.Dispose();
-                _hotkeyService = null;
+                _hotkeyService?.Dispose(); _hotkeyService = null;
                 _viewModel.StatusText = "Hotkeys disabled and saved";
             }
         }
 
         private void ResetHotkeys_Click(object sender, RoutedEventArgs e)
         {
-            // デフォルトホットキーを設定
-            var defaultHotkeys = new List<HotkeySetting>
-            {
-                new HotkeySetting("Ctrl+Alt+Up", HotkeyAction.IncreaseOpacity, 10),
-                new HotkeySetting("Ctrl+Alt+Down", HotkeyAction.DecreaseOpacity, 10),
-                new HotkeySetting("Ctrl+Alt+T", HotkeyAction.ToggleTopMost),
-                new HotkeySetting("Ctrl+Alt+Shift+A", HotkeyAction.SetAllTo80, 80)
-            };
-
-            _viewModel.SettingsService.Settings.HotkeySettings = defaultHotkeys;
-            HotkeySettingsList.ItemsSource = defaultHotkeys; // UI更新
-            _viewModel.StatusText = "Hotkeys reset to defaults";
+            _settingsService.Settings.HotkeySettings = new ApplicationSettings().HotkeySettings;
+            HotkeySettingsList.ItemsSource = _settingsService.Settings.HotkeySettings;
+            SaveHotkeys_Click(sender, e);
         }
 
         // --- Bulk Window Operations ---
         private void SetAllTo80Percent_Click(object sender, RoutedEventArgs e)
         {
-            var targets = GetBulkTargetWindows().ToList();
-            var percent = _viewModel.BulkOpacityPercent;
-            foreach (var window in targets)
-            {
-                _viewModel.WindowService.SetTransparency(window.Handle, percent);
-                window.Opacity = percent;
-            }
-
-            if (_viewModel.SelectedGroup != null)
-            {
-                _viewModel.StatusText = $"Set group '{_viewModel.SelectedGroup.Name}' windows to {percent}% opacity";
-            }
-            else if (_selectedWindowInfo != null)
-            {
-                _viewModel.StatusText = $"Set windows related to '{_selectedWindowInfo.Title}' to {percent}% opacity";
-            }
-            else
-            {
-                _viewModel.StatusText = $"Set all windows to {percent}% opacity";
-            }
+            ApplyBulkOpacity(80);
         }
 
-        private void SetAllTo100Percent_Click(object sender, RoutedEventArgs e)
-        {
-            var targets = GetBulkTargetWindows().ToList();
-            foreach (var window in targets)
-            {
-                _viewModel.WindowService.SetTransparency(window.Handle, 100);
-                window.Opacity = 100;
-            }
+        private void SetAllTo100Percent_Click(object sender, RoutedEventArgs e) => ApplyBulkOpacity(100);
 
-            if (_viewModel.SelectedGroup != null)
-            {
-                _viewModel.StatusText = $"Set group '{_viewModel.SelectedGroup.Name}' windows to 100% opacity";
-            }
-            else if (_selectedWindowInfo != null)
-            {
-                _viewModel.StatusText = $"Set windows related to '{_selectedWindowInfo.Title}' to 100% opacity";
-            }
-            else
-            {
-                _viewModel.StatusText = "Set all windows to 100% opacity";
-            }
+        private void ApplyBulkOpacity(int opacity)
+        {
+            var result = new WindowOperationResult();
+            foreach (var window in GetBulkTargetWindows().ToList())
+                if (SetTransparency(window.Handle, opacity)) result.Succeeded++; else result.Failed++;
+            ShowOperationResult($"Selected targets opacity {opacity}%", result);
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)

@@ -24,6 +24,10 @@ namespace WindowSlu.ViewModels
         private readonly MainWindow _mainWindow;
         private readonly DispatcherTimer _updateTimer;
 
+        public string OperationDetails { get => _operationDetails; set { _operationDetails = value; OnPropertyChanged(); } }
+        private string _operationDetails = string.Empty;
+        private bool _refreshing;
+
         private string _statusText = "Ready";
         public string StatusText
         {
@@ -124,14 +128,14 @@ namespace WindowSlu.ViewModels
             }
         }
 
-        public MainViewModel(SettingsService settingsService, WindowService windowService, MainWindow mainWindow)
+        public MainViewModel(SettingsService settingsService, WindowService windowService, MainWindow mainWindow, string? dataDirectory = null)
         {
             _settingsService = settingsService;
             WindowService = windowService;
             GroupingService = new GroupingService();
-            PresetService = new PresetService(windowService, GroupingService);
+            PresetService = new PresetService(windowService, GroupingService, dataDirectory == null ? null : System.IO.Path.Combine(dataDirectory, "presets.json"));
             LinkedDragService = new LinkedDragService(GroupingService, windowService);
-            LayoutService = new LayoutService(windowService);
+            LayoutService = new LayoutService(windowService, dataDirectory == null ? null : System.IO.Path.Combine(dataDirectory, "layouts.json"));
             _mainWindow = mainWindow;
 
             _updateTimer = new DispatcherTimer
@@ -154,6 +158,10 @@ namespace WindowSlu.ViewModels
 
         public async Task RefreshWindowList()
         {
+            if (_refreshing) return;
+            _refreshing = true;
+            try
+            {
             var newWindows = await Task.Run(() => WindowService.GetAllWindows());
             var foregroundWindow = await Task.Run(() => WindowService.GetForegroundWindow());
             
@@ -176,6 +184,7 @@ namespace WindowSlu.ViewModels
                     else
                     {
                         existing.Title = window.Title;
+                        existing.Opacity = WindowService.GetTransparency(window.Handle);
                         bool isActuallyTopMost = WindowService.IsTopMost(window.Handle);
                         if (existing.IsTopMost != isActuallyTopMost)
                         {
@@ -210,6 +219,8 @@ namespace WindowSlu.ViewModels
                 OnPropertyChanged(nameof(WindowGroups));
                 OnPropertyChanged(nameof(FilteredWindows));
             });
+            }
+            finally { _refreshing = false; }
         }
 
         /// <summary>

@@ -1,4 +1,6 @@
-# WindowSlu 開発ロードマップ
+# WindowSlu 開発ロードマップ（旧記録）
+
+この文書は初期版の記録です。ホイール操作、タイトルバーのテーマ切り替え、bin/obj除外は現在実装済みです。現在の計画は[ROADMAP.md](ROADMAP.md)、進捗と検証は[HANDOVER.md](HANDOVER.md)を参照してください。
 
 ## 現在の実装状況
 

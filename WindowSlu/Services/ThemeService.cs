@@ -7,8 +7,8 @@ namespace WindowSlu.Services
 
     public class ThemeService
     {
-        private const string LightThemeUri = "/Themes/LightTheme.xaml";
-        private const string DarkThemeUri = "/Themes/DarkTheme.xaml";
+        private const string LightThemeUri = "/WindowSlu;component/Themes/LightTheme.xaml";
+        private const string DarkThemeUri = "/WindowSlu;component/Themes/DarkTheme.xaml";
 
         public void ApplyTheme(Theme theme)
         {

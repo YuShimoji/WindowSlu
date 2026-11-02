@@ -24,6 +24,7 @@
 - .NET 10移行、PR/masterの回帰テストCI、タグ配布前テストを追加。Ctrl+ホイールの無効化、Help、READMEと旧ロードマップの参照先を整備。
 - `dotnet test WindowSlu.Tests/WindowSlu.Tests.csproj -c Release` は **33件成功・失敗0・スキップ0**。Release buildは警告0・エラー0。`dotnet publish ... -c Release -r win-x64 --self-contained false` も成功。
 - 実Windows APIで専用テストウィンドウの透明度・位置・サイズと最前面状態の成否通知、専用ホットキーの登録解除を確認。WPFのグループ操作・競合通知・選択切替を確認し、Windows/Presets/Layouts/Settings/Helpを既定幅525で描画した。
+- GitHub Actionsでもcommit `9447d6d` のBuild and Test WindowSluが成功（run `41382971207`）。Node.js 20依存の警告を受け、公式リリースで確認したcheckout v7.0.1 / setup-dotnet v6.0.0 / upload-artifact v7.0.2へ更新。アプリの変更は無し。
 - ローカル証跡: `artifacts/test-results/` のTRX、`artifacts/ui/` のPNG。配布確認用実行ファイル: `WindowSlu/bin/Release/net10.0-windows/win-x64/publish/WindowSlu.exe`。いずれもGit管理外。実装の共有先は従来通り `origin/master`、公開リリース用タグは作成しない。
 
 ### 既知の制約と後続候補

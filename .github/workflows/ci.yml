@@ -12,15 +12,15 @@ jobs:
   test:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-dotnet@v6.0.0
         with:
           dotnet-version: '10.0.x'
       - name: Release build and regression tests
         run: dotnet test WindowSlu.Tests/WindowSlu.Tests.csproj -c Release --logger trx --results-directory artifacts/test-results
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: test-results
           path: artifacts/test-results

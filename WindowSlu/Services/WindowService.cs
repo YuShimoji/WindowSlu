@@ -54,6 +54,20 @@ namespace WindowSlu.Services
         private static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
 
         [DllImport("user32.dll")]
+        private static extern bool IsWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsZoomed(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        private const int SW_RESTORE = 9;
+
+        [DllImport("user32.dll")]
         private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
@@ -88,13 +102,13 @@ namespace WindowSlu.Services
         }
 
         private const uint MONITOR_DEFAULTTONEAREST = 2;
-        
+
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool GetLayeredWindowAttributes(IntPtr hwnd, out uint crKey, out byte bAlpha, out uint dwFlags);
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
-        
+
         [DllImport("dwmapi.dll")]
         private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out bool pvAttribute, int cbAttribute);
 
@@ -151,7 +165,7 @@ namespace WindowSlu.Services
             {
                 if (!IsWindowVisible(hWnd) || GetWindowTextLength(hWnd) == 0)
                     return true;
-                
+
                 GetWindowThreadProcessId(hWnd, out uint processId);
                 if (processId == selfProcessId)
                     return true;
@@ -160,19 +174,19 @@ namespace WindowSlu.Services
                 int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
                 if ((exStyle & WS_EX_TOOLWINDOW) == WS_EX_TOOLWINDOW)
                     return true;
-                
+
                 // Filter out cloaked UWP windows
                 if (DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out bool isCloaked, Marshal.SizeOf<bool>()) == 0 && isCloaked)
                     return true;
 
                 Process p = Process.GetProcessById((int)processId);
-                
+
                 if (_processNameBlocklist.Contains(p.ProcessName))
                     return true;
 
                 var sb = new StringBuilder(256);
                 GetWindowText(hWnd, sb, sb.Capacity);
-                
+
                 string fileDescription;
                 ImageSource? icon = null;
                 try
@@ -196,7 +210,7 @@ namespace WindowSlu.Services
                     ProcessName = fileDescription,
                     ProcessId = (int)processId,
                     Icon = icon,
-                    Opacity = 100, 
+                    Opacity = 100,
                     IsTopMost = (GetWindowLong(hWnd, -20) & 0x8) != 0, // GWL_EXSTYLE & WS_EX_TOPMOST
                     IsClickThrough = (GetWindowLong(hWnd, -20) & 0x20) != 0 // GWL_EXSTYLE & WS_EX_TRANSPARENT
                 });
@@ -205,7 +219,7 @@ namespace WindowSlu.Services
 
             return windows;
         }
-        
+
         public virtual int GetTransparency(IntPtr hWnd)
         {
             int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
@@ -219,7 +233,7 @@ namespace WindowSlu.Services
                 // エラーが発生した場合、またはアルファが設定されていない場合は、100%を返す
             return 100;
             }
-            
+
             return (int)Math.Round(alpha / 2.55);
         }
 
@@ -265,10 +279,10 @@ namespace WindowSlu.Services
                 // If not layered, apply the style first.
                 SetWindowLong(hWnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
             }
-            
+
             // Re-fetch the style to ensure we have the latest state.
             exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
-            
+
             bool isClickThrough = (exStyle & 0x20) != 0; // WS_EX_TRANSPARENT
             int newExStyle;
 
@@ -284,7 +298,7 @@ namespace WindowSlu.Services
                 newExStyle = exStyle | 0x20;
                 LoggingService.LogInfo("Enabling click-through.");
             }
-            
+
             if (SetWindowLong(hWnd, GWL_EXSTYLE, newExStyle) == 0)
             {
                 LoggingService.LogError($"SetWindowLong failed for window {hWnd} while toggling click-through. Win32Error: {Marshal.GetLastWin32Error()}");
@@ -350,6 +364,14 @@ namespace WindowSlu.Services
             return success;
         }
 
+        /// <summary>Restores a valid minimized or maximized window before arranging it.</summary>
+        public virtual bool PrepareForArrangement(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return false;
+            if (IsIconic(hWnd) || IsZoomed(hWnd)) ShowWindow(hWnd, SW_RESTORE);
+            return IsWindow(hWnd) && !IsIconic(hWnd) && !IsZoomed(hWnd);
+        }
+
         /// <summary>
         /// ウィンドウのサイズのみを変更（位置は維持）
         /// </summary>
@@ -371,11 +393,11 @@ namespace WindowSlu.Services
         public virtual string GetMonitorId(IntPtr hWnd)
         {
             if (hWnd == IntPtr.Zero) return string.Empty;
-            
+
             IntPtr hMonitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
             MONITORINFOEX monitorInfo = new MONITORINFOEX();
             monitorInfo.cbSize = Marshal.SizeOf(typeof(MONITORINFOEX));
-            
+
             if (GetMonitorInfo(hMonitor, ref monitorInfo))
             {
                 return monitorInfo.szDevice;
@@ -390,12 +412,12 @@ namespace WindowSlu.Services
         public virtual List<MonitorInfo> GetAllMonitors()
         {
             var monitors = new List<MonitorInfo>();
-            
+
             EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData) =>
             {
                 MONITORINFOEX monitorInfo = new MONITORINFOEX();
                 monitorInfo.cbSize = Marshal.SizeOf(typeof(MONITORINFOEX));
-                
+
                 if (GetMonitorInfo(hMonitor, ref monitorInfo))
                 {
                     monitors.Add(new MonitorInfo
@@ -408,7 +430,7 @@ namespace WindowSlu.Services
                 }
                 return true;
             }, IntPtr.Zero);
-            
+
             return monitors;
         }
 
@@ -419,7 +441,7 @@ namespace WindowSlu.Services
         public void UpdateWindowPositionInfo(WindowInfo windowInfo)
         {
             if (windowInfo.Handle == IntPtr.Zero) return;
-            
+
             var rect = GetWindowPosition(windowInfo.Handle);
             windowInfo.Left = rect.Left;
             windowInfo.Top = rect.Top;
@@ -439,4 +461,4 @@ namespace WindowSlu.Services
         public WindowService.RECT WorkArea { get; set; }
         public bool IsPrimary { get; set; }
     }
-} 
+}

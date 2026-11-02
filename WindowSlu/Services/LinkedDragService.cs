@@ -26,6 +26,7 @@ namespace WindowSlu.Services
         private const int DEBOUNCE_DELAY_MS = 100; // デバウンス遅延（ミリ秒）
         private volatile bool _isProcessingMoves;
         private readonly Dictionary<IntPtr, DateTime> _suppressedUntil = new Dictionary<IntPtr, DateTime>();
+        private readonly Dictionary<IntPtr, int> _arrangementSuspensions = new Dictionary<IntPtr, int>();
         private const int SUPPRESS_AFTER_MOVE_MS = 200;
 
         // WinEventHook P/Invoke
@@ -41,7 +42,7 @@ namespace WindowSlu.Services
         private const uint WINEVENT_OUTOFCONTEXT = 0x0000;
         private const uint EVENT_OBJECT_DESTROY = 0x8001;
 
-        public LinkedDragService(GroupingService groupingService, WindowService windowService)
+        public LinkedDragService(GroupingService groupingService, WindowService windowService, bool enableHook = true)
         {
             _groupingService = groupingService ?? throw new ArgumentNullException(nameof(groupingService));
             _windowService = windowService ?? throw new ArgumentNullException(nameof(windowService));
@@ -51,15 +52,16 @@ namespace WindowSlu.Services
             _winEventDelegate = WinEventProc;
 
             // WinEventHook を有効化（全プロセス対象、位置変更イベントのみ）
-            _eventHook = SetWinEventHook(
+            _eventHook = enableHook ? SetWinEventHook(
                 EVENT_OBJECT_LOCATIONCHANGE,
                 EVENT_OBJECT_LOCATIONCHANGE,
                 IntPtr.Zero,
                 _winEventDelegate,
                 0,
                 0,
-                WINEVENT_OUTOFCONTEXT);
+                WINEVENT_OUTOFCONTEXT) : IntPtr.Zero;
 
+            if (!enableHook) return;
             if (_eventHook == IntPtr.Zero)
             {
                 LoggingService.LogError("LinkedDragService: Failed to set WinEventHook for linked drag.");
@@ -101,6 +103,11 @@ namespace WindowSlu.Services
 
             lock (_lock)
             {
+                if (_arrangementSuspensions.ContainsKey(hwnd))
+                {
+                    _lastPositions[hwnd] = currentPos;
+                    return;
+                }
                 if (_suppressedUntil.TryGetValue(hwnd, out var until))
                 {
                     if (DateTime.UtcNow <= until)
@@ -160,6 +167,53 @@ namespace WindowSlu.Services
 
                 // 位置を更新
                 _lastPositions[hwnd] = currentPos;
+            }
+        }
+
+        /// <summary>一時的な配置変更中、指定ウィンドウからの連動ドラッグを停止します。</summary>
+        public IDisposable SuspendForArrangement(IEnumerable<IntPtr> handles)
+        {
+            if (handles == null) throw new ArgumentNullException(nameof(handles));
+            var targets = handles.Where(h => h != IntPtr.Zero).Distinct().ToArray();
+            lock (_lock)
+            {
+                foreach (var handle in targets)
+                {
+                    _arrangementSuspensions.TryGetValue(handle, out var count);
+                    _arrangementSuspensions[handle] = count + 1;
+                    var rect = _windowService.GetWindowPosition(handle);
+                    if (rect.Width != 0 || rect.Height != 0) _lastPositions[handle] = new Point(rect.Left, rect.Top);
+                    _suppressedUntil[handle] = DateTime.UtcNow.AddMilliseconds(SUPPRESS_AFTER_MOVE_MS);
+                }
+                foreach (var handle in targets) _pendingMoves.Remove(handle);
+                foreach (var handle in _pendingMoves.Where(p => targets.Contains(p.Value.LeaderHandle)).Select(p => p.Key).ToArray())
+                    _pendingMoves.Remove(handle);
+                _debounceTimer.Change(_pendingMoves.Count == 0 ? Timeout.Infinite : DEBOUNCE_DELAY_MS, Timeout.Infinite);
+            }
+            return new ArrangementScope(this, targets);
+        }
+
+        private sealed class ArrangementScope : IDisposable
+        {
+            private LinkedDragService? _owner;
+            private readonly IntPtr[] _handles;
+            public ArrangementScope(LinkedDragService owner, IntPtr[] handles) { _owner = owner; _handles = handles; }
+            public void Dispose() => Interlocked.Exchange(ref _owner, null)?.ResumeArrangement(_handles);
+        }
+
+        private void ResumeArrangement(IEnumerable<IntPtr> handles)
+        {
+            lock (_lock)
+            {
+                foreach (var handle in handles)
+                {
+                    if (!_arrangementSuspensions.TryGetValue(handle, out var count)) continue;
+                    if (count > 1) _arrangementSuspensions[handle] = count - 1;
+                    else _arrangementSuspensions.Remove(handle);
+                    var rect = _windowService.GetWindowPosition(handle);
+                    if (rect.Width != 0 || rect.Height != 0) _lastPositions[handle] = new Point(rect.Left, rect.Top);
+                    _suppressedUntil[handle] = DateTime.UtcNow.AddMilliseconds(SUPPRESS_AFTER_MOVE_MS);
+                }
             }
         }
 

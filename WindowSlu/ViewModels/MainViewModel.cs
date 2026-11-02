@@ -20,6 +20,7 @@ namespace WindowSlu.ViewModels
         public PresetService PresetService { get; }
         public LinkedDragService LinkedDragService { get; }
         public LayoutService LayoutService { get; }
+        public SplitArrangementService SplitArrangementService { get; }
         public SettingsService SettingsService => _settingsService;
         private readonly MainWindow _mainWindow;
         private readonly DispatcherTimer _updateTimer;
@@ -52,6 +53,7 @@ namespace WindowSlu.ViewModels
                 {
                     _selectedGroup = value;
                     OnPropertyChanged();
+                    NotifySplitTargetChanged();
                 }
             }
         }
@@ -66,6 +68,7 @@ namespace WindowSlu.ViewModels
                 {
                     _selectedWindow = value;
                     OnPropertyChanged();
+                    NotifySplitTargetChanged();
                 }
             }
         }
@@ -115,6 +118,25 @@ namespace WindowSlu.ViewModels
         /// </summary>
         public ObservableCollection<WindowGroup> WindowGroups => GroupingService.Groups;
 
+        public IReadOnlyList<WindowInfo> GetSplitTargets()
+        {
+            if (SelectedGroup != null) return SelectedGroup.Windows.ToList();
+            if (SelectedWindow == null) return Array.Empty<WindowInfo>();
+            var group = WindowGroups.FirstOrDefault(g => g.Windows.Any(w => w.Handle == SelectedWindow.Handle));
+            return group?.Windows.ToList() ?? new List<WindowInfo> { SelectedWindow };
+        }
+
+        public bool CanSplitSelectedGroup => GetSplitTargets().Where(w => w.Handle != IntPtr.Zero).Select(w => w.Handle).Distinct().Count() >= 2;
+        public string SplitTargetDescription => CanSplitSelectedGroup
+            ? $"Arrange {GetSplitTargets().Count} windows on the first window's monitor."
+            : "Select a group with at least two windows, or a window belonging to that group.";
+
+        public void NotifySplitTargetChanged()
+        {
+            OnPropertyChanged(nameof(CanSplitSelectedGroup));
+            OnPropertyChanged(nameof(SplitTargetDescription));
+        }
+
         public int BulkOpacityPercent
         {
             get => _settingsService.Settings.BulkOpacityPercent;
@@ -128,14 +150,15 @@ namespace WindowSlu.ViewModels
             }
         }
 
-        public MainViewModel(SettingsService settingsService, WindowService windowService, MainWindow mainWindow, string? dataDirectory = null)
+        public MainViewModel(SettingsService settingsService, WindowService windowService, MainWindow mainWindow, string? dataDirectory = null, bool enableSystemHooks = true)
         {
             _settingsService = settingsService;
             WindowService = windowService;
             GroupingService = new GroupingService();
             PresetService = new PresetService(windowService, GroupingService, dataDirectory == null ? null : System.IO.Path.Combine(dataDirectory, "presets.json"));
-            LinkedDragService = new LinkedDragService(GroupingService, windowService);
+            LinkedDragService = new LinkedDragService(GroupingService, windowService, enableHook: enableSystemHooks);
             LayoutService = new LayoutService(windowService, dataDirectory == null ? null : System.IO.Path.Combine(dataDirectory, "layouts.json"));
+            SplitArrangementService = new SplitArrangementService(windowService);
             _mainWindow = mainWindow;
 
             _updateTimer = new DispatcherTimer
@@ -218,6 +241,7 @@ namespace WindowSlu.ViewModels
                 GroupingService.UpdateGroups(Windows);
                 OnPropertyChanged(nameof(WindowGroups));
                 OnPropertyChanged(nameof(FilteredWindows));
+                NotifySplitTargetChanged();
             });
             }
             finally { _refreshing = false; }

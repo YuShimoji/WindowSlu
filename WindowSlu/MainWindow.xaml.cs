@@ -42,17 +42,17 @@ namespace WindowSlu
         private readonly bool _enableSystemHooks;
         public MainWindow() : this(null, true) { }
 
-        public MainWindow(string? dataDirectory, bool enableSystemHooks)
+        public MainWindow(string? dataDirectory, bool enableSystemHooks, WindowService? windowServiceOverride = null)
         {
             _enableSystemHooks = enableSystemHooks;
             LoggingService.LogInfo("MainWindow constructor called.");
             InitializeComponent();
             InitializeIndicatorTimer();
             
-            var windowService = new WindowService();
+            var windowService = windowServiceOverride ?? new WindowService();
             _themeService = new ThemeService();
             _settingsService = new SettingsService(dataDirectory == null ? null : System.IO.Path.Combine(dataDirectory, "settings.json"));
-            _viewModel = new MainViewModel(_settingsService, windowService, this, dataDirectory);
+            _viewModel = new MainViewModel(_settingsService, windowService, this, dataDirectory, enableSystemHooks);
             this.DataContext = _viewModel;
 
             // Tests can render the UI without installing system input hooks.
@@ -440,11 +440,16 @@ namespace WindowSlu
         {
             _selectedWindowInfo = (sender as ListView)?.SelectedItem as WindowInfo;
             _viewModel.SelectedWindow = _selectedWindowInfo;
-            if (_selectedWindowInfo != null) _viewModel.SelectedGroup = null;
+            if (_selectedWindowInfo != null)
+            {
+                ClearTreeSelection(WindowTreeView);
+                _viewModel.SelectedGroup = null;
+            }
         }
         
         private void WindowTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
+            if (e.NewValue != null) AllWindowsListView.SelectedItem = null;
             if (e.NewValue is WindowInfo windowInfo)
             {
                 _selectedWindowInfo = windowInfo;
@@ -458,6 +463,32 @@ namespace WindowSlu
                 _viewModel.SelectedGroup = group;
                 GroupNameTextBox.Text = group.Name;
             }
+        }
+
+        private static void ClearTreeSelection(ItemsControl parent)
+        {
+            foreach (var item in parent.Items)
+                if (parent.ItemContainerGenerator.ContainerFromItem(item) is TreeViewItem container)
+                {
+                    if (container.IsSelected) container.IsSelected = false;
+                    ClearTreeSelection(container);
+                }
+        }
+
+        private void SplitGroup_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: SplitDirection direction }) return;
+            var windows = _viewModel.GetSplitTargets();
+            if (!_viewModel.CanSplitSelectedGroup)
+            {
+                _viewModel.StatusText = _viewModel.SplitTargetDescription;
+                _viewModel.OperationDetails = string.Empty;
+                return;
+            }
+            WindowOperationResult result;
+            using (_viewModel.LinkedDragService.SuspendForArrangement(windows.Select(w => w.Handle)))
+                result = _viewModel.SplitArrangementService.Arrange(windows, direction);
+            ShowOperationResult(direction == SplitDirection.SideBySide ? "Side by side" : "Stacked", result);
         }
 
         private void CascadeButton_Click(object sender, RoutedEventArgs e)
@@ -615,6 +646,7 @@ namespace WindowSlu
             if (e.Data.GetData(typeof(WindowInfo)) is WindowInfo window && sender is FrameworkElement element && element.Tag is WindowGroup group)
             {
                 _viewModel.GroupingService.AddToGroup(group, window);
+                _viewModel.NotifySplitTargetChanged();
                 _viewModel.StatusText = _viewModel.PresetService.SavePresets()
                     ? $"Moved '{window.Title}' to '{group.Name}'" : _viewModel.PresetService.LastError!;
             }

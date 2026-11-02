@@ -55,7 +55,11 @@ public class UiAndNativeTests
             MainWindow? window = null;
             try
             {
-                window = new MainWindow(directory, false);
+                var splitNative = new UiSplitWindows();
+                window = new MainWindow(directory, false, splitNative);
+                var initialContent = (FrameworkElement)window.Content;
+                initialContent.Measure(new Size(525, 700)); initialContent.Arrange(new Rect(0, 0, 525, 700)); initialContent.UpdateLayout();
+                window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.DataBind);
                 var viewModel = (MainViewModel)window.DataContext;
                 Assert.All(viewModel.SettingsService.Settings.HotkeySettings, key => Assert.NotEmpty(key.Keys));
                 var name = (TextBox)window.FindName("GroupNameTextBox");
@@ -70,6 +74,38 @@ public class UiAndNativeTests
                 _ = new PresetService(new WindowService(), restoredGroups, Path.Combine(directory, "presets.json"));
                 Assert.Equal(group.Id, Assert.Single(restoredGroups.Groups).Id);
                 Assert.Equal("Renamed", Assert.Single(restoredGroups.Groups).Name);
+
+                var side = (Button)window.FindName("SplitSideBySideButton");
+                var stacked = (Button)window.FindName("SplitStackedButton");
+                Assert.False(side.IsEnabled);
+                side.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Empty(splitNative.Moves);
+                var first = new WindowInfo { Handle = new IntPtr(201), Title = "Split first", ProcessName = "split-test", Opacity = 80, IncludeInLinkedDrag = false };
+                var second = new WindowInfo { Handle = new IntPtr(202), Title = "Split second", ProcessName = "split-test", Opacity = 60 };
+                var outsider = new WindowInfo { Handle = new IntPtr(203), Title = "Outside selection", ProcessName = "outside" };
+                viewModel.Windows.Add(first); viewModel.Windows.Add(second); viewModel.Windows.Add(outsider);
+                viewModel.GroupingService.AddToGroup(group, first);
+                viewModel.NotifySplitTargetChanged();
+                Assert.False(side.IsEnabled);
+                viewModel.GroupingService.AddToGroup(group, second);
+                viewModel.NotifySplitTargetChanged();
+                group.LinkedDragEnabled = true;
+                Assert.True(side.IsEnabled); Assert.True(stacked.IsEnabled);
+                side.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Equal(2, splitNative.Moves.Count);
+                Assert.Equal(-1200, first.Left); Assert.Equal(-600, second.Left);
+                Assert.Equal(600, first.Width); Assert.Equal(800, first.Height);
+                Assert.DoesNotContain(outsider.Handle, splitNative.Moves);
+                stacked.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Equal(0, first.Top); Assert.Equal(400, second.Top);
+                Assert.Equal(1200, first.Width); Assert.Equal(400, first.Height);
+                Assert.Equal(80, first.Opacity); Assert.Equal(60, second.Opacity);
+                Assert.True(group.LinkedDragEnabled); Assert.False(first.IncludeInLinkedDrag);
+                splitNative.FailHandle = second.Handle;
+                side.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Contains("1 succeeded, 1 failed", viewModel.StatusText);
+                Assert.NotEmpty(viewModel.OperationDetails);
+                splitNative.FailHandle = IntPtr.Zero;
 
                 var preset = viewModel.PresetService.CreatePreset("Shortcut test");
                 preset.HotKey = "Ctrl+F1";
@@ -87,7 +123,34 @@ public class UiAndNativeTests
                     .Invoke(window, new object[] { list, new SelectionChangedEventArgs(SelectorSelectionChangedEvent(), Array.Empty<object>(), new object[] { selectedWindow }) });
                 Assert.Null(viewModel.SelectedGroup);
                 Assert.Same(selectedWindow, viewModel.SelectedWindow);
+                Assert.False(side.IsEnabled);
+                viewModel.SelectedWindow = first;
+                Assert.True(side.IsEnabled); // Selecting a group member uses its group.
+                viewModel.SelectedWindow = null;
+                Assert.False(side.IsEnabled);
+                int movesBeforeNoSelection = splitNative.Moves.Count;
+                stacked.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Equal(movesBeforeNoSelection, splitNative.Moves.Count);
                 viewModel.SelectedGroup = group;
+                side.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+                initialContent.Measure(new Size(525, 700)); initialContent.Arrange(new Rect(0, 0, 525, 700)); initialContent.UpdateLayout();
+                var allWindowsList = (ListView)window.FindName("AllWindowsListView");
+                var tree = (TreeView)window.FindName("WindowTreeView");
+                var groupItem = (TreeViewItem)tree.ItemContainerGenerator.ContainerFromItem(group)!;
+                Assert.NotNull(groupItem);
+                Assert.Contains(FindVisual<TextBlock>(allWindowsList), block => block.Text == first.Title);
+                groupItem.IsSelected = true;
+                allWindowsList.SelectedItem = outsider;
+                Assert.False(groupItem.IsSelected);
+                Assert.Null(viewModel.SelectedGroup);
+                Assert.Same(outsider, viewModel.SelectedWindow);
+                Assert.False(side.IsEnabled);
+                groupItem.IsSelected = true;
+                Assert.Null(allWindowsList.SelectedItem);
+                Assert.Same(group, viewModel.SelectedGroup);
+                Assert.True(side.IsEnabled);
+                side.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
                 // Render all changed surfaces to catch missing resources and invalid WPF layout.
                 var content = (FrameworkElement)window.Content;
@@ -106,6 +169,7 @@ public class UiAndNativeTests
                         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap)); encoder.Save(file);
                     }
                 }
+                viewModel.Windows.Clear();
                 Invoke(window, "DeleteGroup_Click");
                 Assert.Empty(viewModel.WindowGroups);
                 _ = new PresetService(new WindowService(), restoredGroups, Path.Combine(directory, "presets.json"));
@@ -118,6 +182,29 @@ public class UiAndNativeTests
                 if (Directory.Exists(directory)) Directory.Delete(directory, true);
             }
         });
+    }
+
+    private sealed class UiSplitWindows : WindowService
+    {
+        public List<IntPtr> Moves { get; } = new();
+        public IntPtr FailHandle { get; set; }
+        private readonly Dictionary<IntPtr, RECT> _positions = new();
+        public override RECT GetWindowPosition(IntPtr handle) => _positions.GetValueOrDefault(handle,
+            new RECT { Left = -1200, Top = 0, Right = -400, Bottom = 600 });
+        public override string GetMonitorId(IntPtr handle) => "ui-test";
+        public override List<MonitorInfo> GetAllMonitors() => new() { new()
+        {
+            DeviceName = "ui-test", IsPrimary = true,
+            Bounds = new() { Left = -1200, Top = 0, Right = 0, Bottom = 900 },
+            WorkArea = new() { Left = -1200, Top = 0, Right = 0, Bottom = 800 }
+        } };
+        public override bool PrepareForArrangement(IntPtr handle) => handle != IntPtr.Zero;
+        public override bool SetWindowPosition(IntPtr handle, int x, int y, int width, int height)
+        {
+            Moves.Add(handle);
+            if (handle == FailHandle) return false;
+            _positions[handle] = new() { Left = x, Top = y, Right = x + width, Bottom = y + height }; return true;
+        }
     }
 
     private static RoutedEvent SelectorSelectionChangedEvent() => System.Windows.Controls.Primitives.Selector.SelectionChangedEvent;
@@ -151,7 +238,7 @@ public class UiAndNativeTests
 
 internal sealed class NativeTestWindow : IDisposable
 {
-    public IntPtr Handle { get; } = CreateWindowEx(0, "STATIC", "WindowSlu isolated native test", unchecked((int)0x80000000),
+    public IntPtr Handle { get; } = CreateWindowEx(0x80, "STATIC", "WindowSlu isolated native test", unchecked((int)0x80000000),
         0, 0, 800, 600, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
     [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "CreateWindowExW", SetLastError = true)]
     private static extern IntPtr CreateWindowEx(int exStyle, string className, string title, int style, int x, int y, int width, int height,
@@ -161,5 +248,8 @@ internal sealed class NativeTestWindow : IDisposable
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW", SetLastError = true)] private static extern int GetWindowLong(IntPtr window, int index);
     public int ExtendedStyle => GetWindowLong(Handle, -20);
     public void ShowWithoutActivation() => ShowWindow(Handle, 4);
+    [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr window);
+    public bool IsMinimized => IsIconic(Handle);
+    public void Minimize() => ShowWindow(Handle, 2);
     public void Dispose() { if (Handle != IntPtr.Zero) DestroyWindow(Handle); }
 }

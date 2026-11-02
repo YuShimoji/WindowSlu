@@ -583,7 +583,7 @@
                                         <TextBlock Grid.Column="1" Text="Title" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource MutedForegroundColor}"/>
                                         <TextBlock Grid.Column="2" Text="Process" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource MutedForegroundColor}" Margin="8,0,0,0"/>
                                     </Grid>
-                                    <ListView ItemsSource="{Binding FilteredWindows}"
+                                    <ListView x:Name="AllWindowsListView" ItemsSource="{Binding FilteredWindows}" SelectionChanged="WindowListView_SelectionChanged"
                                               Background="Transparent"
                                               BorderThickness="0"
                                               ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -630,6 +630,17 @@
                                     <Button Content="New Group" Click="NewGroup_Click" Style="{StaticResource SettingsButtonStyle}"/>
                                     <Button Content="Rename" Click="RenameGroup_Click" Style="{StaticResource SettingsButtonStyle}"/>
                                     <Button Content="Delete Group" Click="DeleteGroup_Click" Style="{StaticResource SettingsButtonStyle}"/>
+                                </WrapPanel>
+                                <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                                    <TextBlock Text="Split group:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <Button x:Name="SplitSideBySideButton" Content="Side by Side" Width="100" MinHeight="26"
+                                            Click="SplitGroup_Click" Tag="{x:Static local:SplitDirection.SideBySide}"
+                                            Style="{StaticResource SettingsButtonStyle}" IsEnabled="{Binding CanSplitSelectedGroup}"
+                                            ToolTip="{Binding SplitTargetDescription}" ToolTipService.ShowOnDisabled="True"/>
+                                    <Button x:Name="SplitStackedButton" Content="Stacked" Width="80" MinHeight="26"
+                                            Click="SplitGroup_Click" Tag="{x:Static local:SplitDirection.Stacked}"
+                                            Style="{StaticResource SettingsButtonStyle}" IsEnabled="{Binding CanSplitSelectedGroup}"
+                                            ToolTip="{Binding SplitTargetDescription}" ToolTipService.ShowOnDisabled="True"/>
                                 </WrapPanel>
                             <TreeView
                                       x:Name="WindowTreeView"
@@ -1201,6 +1212,7 @@
                         <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource ForegroundColor}" LineHeight="22">
                             <Run Text="Select a window or group in Windows, then use its controls or apply a preset."/><LineBreak/><LineBreak/>
                             <Run Text="Groups: enter a name and choose New Group. The selected window is added. Drag window rows onto group headers to move them. Rename and Delete Group apply to the selected manual group."/><LineBreak/><LineBreak/>
+                            <Run Text="Split group: select a group with at least two windows (or one of its windows). Side by Side makes equal columns; Stacked makes equal rows on the first window's monitor work area. Other groups are left in place. Maximized/minimized windows are restored first. Size restrictions are reported as failures."/><LineBreak/><LineBreak/>
                             <Run Text="Presets: Capture saves current settings. Target Process and Group always limit the application, including tray menus and hotkeys. A selection narrows these filters. Save Presets saves both presets and groups."/><LineBreak/><LineBreak/>
                             <Run Text="Layouts: Capture saves the current arrangement. Restore skips ambiguous matches and reports missing or failed windows. Hover over the status text for details."/><LineBreak/><LineBreak/>
                             <Run Text="Shortcuts: enable Hotkeys in Settings and save. Ctrl+MouseWheel changes opacity while enabled; turn it off in Settings to use another application's zoom."/><LineBreak/><LineBreak/>

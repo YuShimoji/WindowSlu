@@ -141,5 +141,3 @@ public sealed class SplitArrangementServiceTests
         }
     }
 }
-
-

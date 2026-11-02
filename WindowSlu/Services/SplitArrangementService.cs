@@ -125,4 +125,3 @@ public sealed class SplitArrangementService
     private static string Format(WindowService.RECT r) => $"({r.Left},{r.Top},{r.Right},{r.Bottom})";
     private static string Describe(WindowInfo w) => string.IsNullOrWhiteSpace(w.Title) ? $"Window {w.Handle}" : $"'{w.Title}'";
 }
-

@@ -59,7 +59,9 @@ internal static class UiImprovementScenarios
 
             // Real template contract: selected tab's input/button peers must be exposed.
             Assert.NotNull(tabs.Template.FindName("PART_SelectedContentHost", tabs));
-            var windowsPeer = UIElementAutomationPeer.CreatePeerForElement((TabItem)tabs.SelectedItem)!;
+            // TabControl creates the data-item peers that expose selected content.
+            // A standalone TabItem wrapper can expose only its header until a UIA client connects.
+            var windowsPeer = UIElementAutomationPeer.CreatePeerForElement(tabs)!;
             var peerNames = PeerNames(windowsPeer).ToList();
             Assert.Contains("Apply displayed opacity to described targets", peerNames);
 
@@ -175,7 +177,7 @@ internal static class UiImprovementScenarios
                     var bitmap = new RenderTargetBitmap((int)window.Width, 700, 96, 96, PixelFormats.Pbgra32); bitmap.Render(content);
                     using var file = File.Create(Path.Combine(output, $"{(int)window.Width}-{name}.png"));
                     var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap)); encoder.Save(file);
-                    File.WriteAllLines(Path.Combine(output, $"{(int)window.Width}-{name}-peers.txt"), PeerNames(UIElementAutomationPeer.CreatePeerForElement((TabItem)tabs.SelectedItem)!));
+                    File.WriteAllLines(Path.Combine(output, $"{(int)window.Width}-{name}-peers.txt"), PeerNames(UIElementAutomationPeer.CreatePeerForElement(tabs)!));
                 }
                 foreach (var theme in new[] { WindowSlu.Theme.Dark, WindowSlu.Theme.Light })
                 {

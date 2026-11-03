@@ -55,7 +55,13 @@ public class NativeSplitArrangementTests
             var before = windows.Select(w => native.GetWindowPosition(w.Handle)).ToList();
             var leader = before[0];
             Assert.True(native.SetWindowPosition(a.Handle, leader.Left + 10, leader.Top + 5, leader.Width, leader.Height));
-            Pump(TimeSpan.FromMilliseconds(400));
+            // Native WinEvents and the debounced ThreadPool callback can be delayed
+            // on a busy desktop. Wait for the observable result, with a finite limit.
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < deadline && windows.Skip(1).Select((w, i) =>
+                native.GetWindowPosition(w.Handle).Left == before[i + 1].Left + 10 &&
+                native.GetWindowPosition(w.Handle).Top == before[i + 1].Top + 5).Any(done => !done))
+                Pump(TimeSpan.FromMilliseconds(25));
             for (int i = 1; i < windows.Count; i++)
             {
                 var actual = native.GetWindowPosition(windows[i].Handle);

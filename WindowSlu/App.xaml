@@ -14,13 +14,14 @@
         <converters:BoolToTopMostTextConverter x:Key="BoolToTopMostTextConverter"/>
         <converters:PercentToWidthMultiConverter x:Key="PercentToWidthMultiConverter"/>
 
-        <!-- テキストブロックのスタイル -->
-        <Style TargetType="TextBlock">
+        <!-- Text inherits its host foreground. A global TextBlock foreground breaks selection presenters. -->
+        <Style TargetType="Window">
+            <Setter Property="Background" Value="{DynamicResource BackgroundColor}"/>
             <Setter Property="Foreground" Value="{DynamicResource ForegroundColor}"/>
         </Style>
-
         <!-- ボタンのスタイル -->
         <Style TargetType="Button">
+            <Setter Property="MinHeight" Value="28"/>
             <Setter Property="Background" Value="{DynamicResource ControlColor}"/>
             <Setter Property="Foreground" Value="{DynamicResource ForegroundColor}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderColor}"/>
@@ -213,13 +214,99 @@
                 </Setter>
         </Style>
 
-        <!-- TextBoxのスタイル -->
+        <!-- Paired input colors are shared by main views, popups and additional windows. -->
         <Style TargetType="TextBox">
-            <Setter Property="Background" Value="{DynamicResource ControlColor}"/>
-            <Setter Property="Foreground" Value="{DynamicResource ForegroundColor}"/>
+            <Setter Property="MinHeight" Value="28"/>
+            <Setter Property="Padding" Value="5,2"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{DynamicResource InputBackground}"/>
+            <Setter Property="Foreground" Value="{DynamicResource InputForeground}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource InputForeground}"/>
+            <Setter Property="SelectionBrush" Value="{DynamicResource InputSelectionBackground}"/>
+            <Setter Property="SelectionTextBrush" Value="{DynamicResource InputSelectionForeground}"/>
+            <Setter Property="SelectionOpacity" Value="1"/>
             <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox">
+                <Border x:Name="InputBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}">
+                    <ScrollViewer x:Name="PART_ContentHost"/>
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsReadOnly" Value="True"><Setter Property="Background" Value="{DynamicResource InputReadOnlyBackground}"/></Trigger>
+                    <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="InputBorder" Property="BorderBrush" Value="{DynamicResource AccentColor}"/></Trigger>
+                    <Trigger Property="IsEnabled" Value="False"><Setter Property="Background" Value="{DynamicResource InputDisabledBackground}"/><Setter Property="Foreground" Value="{DynamicResource InputDisabledForeground}"/></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
         </Style>
-
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="{DynamicResource InputBackground}"/>
+            <Setter Property="Foreground" Value="{DynamicResource InputForeground}"/>
+            <Setter Property="MinHeight" Value="28"/><Setter Property="Padding" Value="6,3"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBoxItem">
+                <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}"><ContentPresenter TextElement.Foreground="{TemplateBinding Foreground}"/></Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsHighlighted" Value="True"><Setter Property="Background" Value="{DynamicResource InputSelectionBackground}"/><Setter Property="Foreground" Value="{DynamicResource InputSelectionForeground}"/></Trigger>
+                    <Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{DynamicResource InputSelectionBackground}"/><Setter Property="Foreground" Value="{DynamicResource InputSelectionForeground}"/></Trigger>
+                    <Trigger Property="IsEnabled" Value="False"><Setter Property="Background" Value="{DynamicResource InputDisabledBackground}"/><Setter Property="Foreground" Value="{DynamicResource InputDisabledForeground}"/></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="28"/><Setter Property="Padding" Value="6,2"/>
+            <Setter Property="Background" Value="{DynamicResource InputBackground}"/>
+            <Setter Property="Foreground" Value="{DynamicResource InputForeground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox">
+                <Grid>
+                    <ToggleButton x:Name="DropToggle" Focusable="False" IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Background="{TemplateBinding Background}" Foreground="{TemplateBinding Foreground}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                        <ToggleButton.Template><ControlTemplate TargetType="ToggleButton">
+                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"><TextBlock Text="▾" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{TemplateBinding Foreground}"/></Border>
+                        </ControlTemplate></ToggleButton.Template>
+                    </ToggleButton>
+                    <ContentPresenter x:Name="SelectionPresenter" Margin="6,2,22,2" VerticalAlignment="Center" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" TextElement.Foreground="{TemplateBinding Foreground}"/>
+                    <TextBox x:Name="PART_EditableTextBox" Visibility="Collapsed" Margin="2,0,22,0" IsReadOnly="{TemplateBinding IsReadOnly}" Background="{TemplateBinding Background}" Foreground="{TemplateBinding Foreground}"/>
+                    <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True" IsOpen="{TemplateBinding IsDropDownOpen}" Focusable="False">
+                        <Border Background="{DynamicResource InputBackground}" TextElement.Foreground="{DynamicResource InputForeground}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" MaxHeight="300">
+                            <ScrollViewer CanContentScroll="True"><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer>
+                        </Border>
+                    </Popup>
+                </Grid>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/></Trigger>
+                    <Trigger Property="IsEditable" Value="True"><Setter TargetName="SelectionPresenter" Property="Visibility" Value="Hidden"/><Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible"/></Trigger>
+                    <Trigger Property="IsEnabled" Value="False"><Setter Property="Background" Value="{DynamicResource InputDisabledBackground}"/><Setter Property="Foreground" Value="{DynamicResource InputDisabledForeground}"/></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style TargetType="ContextMenu"><Setter Property="Background" Value="{DynamicResource InputBackground}"/><Setter Property="Foreground" Value="{DynamicResource InputForeground}"/></Style>
+        <Style TargetType="MenuItem">
+            <Setter Property="Background" Value="{DynamicResource InputBackground}"/><Setter Property="Foreground" Value="{DynamicResource InputForeground}"/>
+            <Setter Property="MinHeight" Value="28"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="MenuItem">
+                <Grid>
+                    <Border Background="{TemplateBinding Background}" Padding="8,4">
+                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="CheckMark" Text="✓" Visibility="Collapsed" Margin="0,0,5,0"/>
+                            <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" TextElement.Foreground="{TemplateBinding Foreground}"/>
+                            <TextBlock x:Name="SubmenuArrow" Grid.Column="2" Text="›" Margin="12,0,0,0" Visibility="Collapsed"/>
+                        </Grid>
+                    </Border>
+                    <Popup x:Name="PART_Popup" Placement="Right" IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}" AllowsTransparency="True" Focusable="False">
+                        <Border Background="{DynamicResource InputBackground}" TextElement.Foreground="{DynamicResource InputForeground}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1"><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/></Border>
+                    </Popup>
+                </Grid>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsChecked" Value="True"><Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/></Trigger>
+                    <Trigger Property="HasItems" Value="True"><Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible"/></Trigger>
+                    <Trigger Property="IsHighlighted" Value="True"><Setter Property="Background" Value="{DynamicResource InputSelectionBackground}"/><Setter Property="Foreground" Value="{DynamicResource InputSelectionForeground}"/></Trigger>
+                    <Trigger Property="IsSubmenuOpen" Value="True"><Setter Property="Background" Value="{DynamicResource InputSelectionBackground}"/><Setter Property="Foreground" Value="{DynamicResource InputSelectionForeground}"/></Trigger>
+                    <Trigger Property="IsEnabled" Value="False"><Setter Property="Background" Value="{DynamicResource InputDisabledBackground}"/><Setter Property="Foreground" Value="{DynamicResource InputDisabledForeground}"/></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
         <!-- CheckBoxのスタイル -->
         <Style TargetType="CheckBox">
             <Setter Property="Foreground" Value="{DynamicResource ForegroundColor}"/>

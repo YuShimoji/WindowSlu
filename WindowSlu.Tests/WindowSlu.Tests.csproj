@@ -20,4 +20,7 @@
     <ProjectReference Include="../WindowSlu/WindowSlu.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="Switch.System.Windows.Controls.Text.UseAdornerForTextboxSelectionRendering" Value="false" />
+  </ItemGroup>
 </Project>

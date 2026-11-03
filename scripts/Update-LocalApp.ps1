@@ -61,6 +61,7 @@ foreach ($entry in @(
     $shortcut.WorkingDirectory = $destination
     $shortcut.IconLocation = $destinationExe + ',0'
     $shortcut.Description = 'WindowSlu'
+    $shortcut.WindowStyle = 1
     $shortcut.Save()
     $readback = $shell.CreateShortcut($entry.path)
     if ($readback.TargetPath -ne $destinationExe -or -not (Test-Path -LiteralPath $readback.TargetPath)) { throw 'Shortcut readback failed.' }

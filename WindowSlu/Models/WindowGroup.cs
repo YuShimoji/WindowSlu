@@ -107,14 +107,29 @@ namespace WindowSlu.Models
         /// </summary>
         public string DisplayHeader => $"{Name} ({WindowCount} windows)";
 
+        private int _opacityTarget = 100;
+        public int OpacityTarget { get => _opacityTarget; set => SetField(ref _opacityTarget, value); }
+        public string OpacitySummary => Windows.Count == 0 ? "Actual: no windows"
+            : Windows.Select(w => w.Opacity).Distinct().Count() == 1 ? $"Actual: {Windows[0].Opacity}% ({Windows.Count} windows)"
+            : $"Actual: mixed {Windows.Min(w => w.Opacity)}–{Windows.Max(w => w.Opacity)}% ({Windows.Count} windows)";
+        private readonly HashSet<WindowInfo> _observed = new();
+        private void ObserveOpacity()
+        {
+            foreach (var old in _observed.Where(w => !Windows.Contains(w)).ToList()) { PropertyChangedEventManager.RemoveHandler(old, WindowChanged, nameof(WindowInfo.Opacity)); _observed.Remove(old); }
+            foreach (var window in Windows.Where(w => !_observed.Contains(w))) { PropertyChangedEventManager.AddHandler(window, WindowChanged, nameof(WindowInfo.Opacity)); _observed.Add(window); }
+            OnPropertyChanged(nameof(OpacitySummary));
+        }
+        private void WindowChanged(object? sender, PropertyChangedEventArgs e) { if (e.PropertyName == nameof(WindowInfo.Opacity)) OnPropertyChanged(nameof(OpacitySummary)); }
+
         public WindowGroup()
         {
             _id = Guid.NewGuid().ToString();
             Windows.CollectionChanged += (s, e) =>
             {
+                ObserveOpacity();
                 OnPropertyChanged(nameof(WindowCount));
                 OnPropertyChanged(nameof(DisplayHeader));
-                
+
                 // 先頭ウィンドウからアイコンを取得
                 if (Windows.Count > 0 && GroupIcon == null)
                 {

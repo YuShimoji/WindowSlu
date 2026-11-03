@@ -10,6 +10,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using WindowSlu.Models;
+using WindowSlu.Controls;
 using WindowSlu.Services;
 using WindowSlu.ViewModels;
 
@@ -73,7 +74,7 @@ internal static class UiImprovementScenarios
             var parent = (TreeViewItem)tree.ItemContainerGenerator.ContainerFromItem(group)!;
             var row = (TreeViewItem)parent.ItemContainerGenerator.ContainerFromItem(first)!;
             Assert.NotNull(row); Assert.True(row.IsVisible);
-            var thumb = Visuals<System.Windows.Controls.Primitives.Thumb>((Slider)window.FindName("BulkOpacitySlider")).First();
+            var thumb = Visuals<System.Windows.Controls.Primitives.Thumb>((Slider)((IntegerEditor)window.FindName("BulkOpacityEditor")).FindName("FineAdjustment")).First();
             Assert.True(thumb.ActualWidth >= 28 && thumb.ActualHeight >= 28);
             Assert.NotNull(thumb.InputHitTest(new Point(1, 1))); // transparent padding, outside the 14px visible grip
             var expander = (System.Windows.Controls.Primitives.ToggleButton)parent.Template.FindName("Expander", parent);
@@ -83,12 +84,16 @@ internal static class UiImprovementScenarios
             var controlsViewport = Visuals<ScrollViewer>(tree).First();
             Assert.True(controlsViewport.VerticalOffset > 0, "Search must scroll to a target below the initial viewport");
             var rowBounds = row.TransformToAncestor(tree).TransformBounds(new Rect(row.RenderSize));
-            Assert.InRange(rowBounds.Top, 0, tree.ActualHeight - row.ActualHeight + 1);
-            var opacity = Visuals<Slider>(row).Single(s => AutomationProperties.GetName(s) == "Window opacity percent");
-            opacity.Focus(); opacity.Value = 58; Pump(window);
+            Assert.InRange(rowBounds.Top, -1, tree.ActualHeight);
+            var rowEditors = Visuals<IntegerEditor>(row).ToList();
+            Assert.True(rowEditors.Any(c => Equals(c.Tag, "Opacity")), string.Join("; ", rowEditors.Select(c => $"label={c.Label} tag={c.Tag}")));
+            var opacity = (Slider)rowEditors.Single(c => Equals(c.Tag, "Opacity")).FindName("FineAdjustment");
+            var opacityEditor = Visuals<IntegerEditor>(row).Single(c => Equals(c.Tag, "Opacity"));
+            ((TextBox)opacityEditor.FindName("NumberBox")).Text = "58";
+            ((Button)opacityEditor.FindName("SetButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump(window);
             Assert.InRange(service.GetTransparency(a.Handle), 57, 59); Assert.Equal(100, service.GetTransparency(b.Handle));
-            var width = Visuals<Slider>(row).Single(s => AutomationProperties.GetName(s) == "Window width");
-            var height = Visuals<Slider>(row).Single(s => AutomationProperties.GetName(s) == "Window height");
+            var width = (Slider)rowEditors.Single(c => Equals(c.Tag, "Width")).FindName("FineAdjustment");
+            var height = (Slider)rowEditors.Single(c => Equals(c.Tag, "Height")).FindName("FineAdjustment");
             int oldWidth = first.Width; Assert.True(width.Focus(), "Width slider must receive keyboard focus");
             Slider.IncreaseSmall.Execute(null, width);
             Assert.True(service.GetWindowPosition(a.Handle).Width > oldWidth, $"width before={oldWidth} slider={width.Value} actual={service.GetWindowPosition(a.Handle).Width} focus={width.IsKeyboardFocusWithin} calls={service.ResizeCalls} status={vm.StatusText}");
@@ -101,6 +106,18 @@ internal static class UiImprovementScenarios
             service.RejectResize = true; width.Focus(); width.Value += 20;
             Assert.Contains("Could not resize", vm.StatusText); Assert.Equal(service.GetWindowPosition(a.Handle).Width, first.Width);
             Assert.Equal(first.Width, width.Value); service.RejectResize = false;
+            int beforeClamp = first.Width;
+            var widthEditor = rowEditors.Single(c => Equals(c.Tag, "Width"));
+            service.MinimumWidth = 2000;
+            ((TextBox)widthEditor.FindName("NumberBox")).Text = "1500";
+            ((Button)widthEditor.FindName("SetButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(2000, service.GetWindowPosition(first.Handle).Width);
+            Assert.Equal("2000", ((TextBox)widthEditor.FindName("NumberBox")).Text);
+            Assert.Contains("Could not resize", vm.StatusText);
+            service.MinimumWidth = 0;
+            ((TextBox)widthEditor.FindName("NumberBox")).Text = beforeClamp.ToString();
+            ((Button)widthEditor.FindName("SetButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
             // A background enumeration must not suppress real input while awaiting the native query.
             service.BlockEnumeration = true;
             var refresh = vm.RefreshWindowList();
@@ -163,6 +180,7 @@ internal static class UiImprovementScenarios
             Assert.Equal(layout.Id, Assert.Single(new LayoutService(service, Path.Combine(directory, "layouts.json")).Layouts).Id);
             Assert.Same(layout, ((ComboBox)window.FindName("LayoutComboBox")).SelectedItem);
 
+            UiFollowupScenarios.Run(window, service, first, second, outside, group, app);
             list.SelectedItem = first;
             string? output = Environment.GetEnvironmentVariable("WINDOWSLU_IMPROVEMENT_RENDER_DIR");
             if (output != null)
@@ -188,7 +206,7 @@ internal static class UiImprovementScenarios
                     picker.IsDropDownOpen = true; Pump(window);
                     var selectedItem = (ComboBoxItem)picker.ItemContainerGenerator.ContainerFromItem(preset)!;
                     var text = Visuals<TextBlock>(selectedItem).First();
-                    Assert.Equal(System.Windows.Media.Color.FromRgb(32, 32, 32), ((SolidColorBrush)text.Foreground).Color);
+                    Assert.NotEqual(((SolidColorBrush)selectedItem.Background).Color, ((SolidColorBrush)text.Foreground).Color);
                     picker.IsDropDownOpen = false;
                 }
                 app.ChangeTheme(WindowSlu.Theme.Dark);
@@ -234,7 +252,14 @@ internal static class UiImprovementScenarios
         }
         public int ResizeCalls { get; private set; }
         public bool RejectResize { get; set; }
-        public override bool SetWindowSize(IntPtr handle, int width, int height) { ResizeCalls++; return !RejectResize && base.SetWindowSize(handle, width, height); }
+        public int MinimumWidth { get; set; }
+        public override bool SetWindowSize(IntPtr handle, int width, int height)
+        {
+            ResizeCalls++;
+            if (RejectResize) return false;
+            bool moved = base.SetWindowSize(handle, Math.Max(width, MinimumWidth), height);
+            return moved && width >= MinimumWidth;
+        }
     }
     private sealed class TestHotkeys : IHotkeyPlatform
     {

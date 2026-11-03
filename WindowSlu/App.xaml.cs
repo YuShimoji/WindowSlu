@@ -16,6 +16,12 @@ namespace WindowSlu
     /// </summary>
     public partial class App : System.Windows.Application
     {
+        static App()
+        {
+            // SelectionTextBrush requires selection behind text, rather than an opaque adorner over it.
+            AppContext.SetSwitch("Switch.System.Windows.Controls.Text.UseAdornerForTextboxSelectionRendering", false);
+        }
+
         public void ChangeTheme(Theme theme)
         {
             // Get the current merged dictionaries

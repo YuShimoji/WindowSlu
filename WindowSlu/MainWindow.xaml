@@ -6,22 +6,15 @@
         xmlns:local="clr-namespace:WindowSlu.Models"
         xmlns:converters="clr-namespace:WindowSlu.Converters"
         xmlns:vm="clr-namespace:WindowSlu.ViewModels"
+        xmlns:controls="clr-namespace:WindowSlu.Controls"
         xmlns:tb="http://www.hardcodet.net/taskbar"
         mc:Ignorable="d"
-        Title="WindowSlu" Height="450" Width="800"
+        Title="WindowSlu" Height="450" Width="800" Foreground="{DynamicResource ForegroundColor}"
         Icon="/WindowSlu;component/Assets/WindowSlu.ico"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="CanResizeWithGrip">
 
     <Window.Resources>
-        <Style TargetType="TextBox"><Setter Property="Background" Value="{DynamicResource ControlColor}"/><Setter Property="Foreground" Value="{DynamicResource ForegroundColor}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/><Setter Property="MinHeight" Value="28"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
-        <Style TargetType="ComboBox">
-            <Setter Property="ItemTemplate"><Setter.Value><DataTemplate><TextBlock Text="{Binding}" Foreground="#202020"/></DataTemplate></Setter.Value></Setter>
-            <Setter Property="MinHeight" Value="28"/>
-            <Setter Property="Foreground" Value="#202020"/>
-            <Setter Property="Background" Value="#FFFFFF"/>
-        </Style>
-        <Style TargetType="Slider"><Setter Property="MinHeight" Value="28"/></Style>
         <converters:BoolToTopMostTextConverter x:Key="BoolToTopMostTextConverter"/>
         <converters:PercentToWidthMultiConverter x:Key="PercentToWidthMultiConverter"/>
 
@@ -470,21 +463,20 @@
             <!-- Main Content -->
             <TabControl x:Name="MainTabs" Grid.Row="1" Style="{DynamicResource ThemedTabControlStyle}">
                 <TabItem Header="Windows" Style="{DynamicResource ThemedTabItemStyle}">
-                    <Grid>
+                    <Grid TextElement.Foreground="{DynamicResource ForegroundColor}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
                         <StackPanel Grid.Row="0" Margin="10,8,10,5">
-                            <WrapPanel VerticalAlignment="Center">
+                            <WrapPanel>
                                 <CheckBox x:Name="AllOpacityTargets" Content="All windows" IsChecked="{Binding ApplyToAllWindows}" VerticalAlignment="Center" Margin="0,0,10,0" MinHeight="28" AutomationProperties.Name="Apply opacity to all managed windows"/>
-                                <TextBlock Text="Opacity:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}" Margin="0,0,5,0"/>
-                                <Slider SmallChange="1" LargeChange="10" IsSnapToTickEnabled="True" TickFrequency="1" x:Name="BulkOpacitySlider" Style="{StaticResource ThemedSliderStyle}" Minimum="0" Maximum="100" Value="{Binding BulkOpacityPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="100" AutomationProperties.Name="Bulk opacity percent"/>
-                                <Button x:Name="ApplyOpacityButton" Click="SetAllTo80Percent_Click" Style="{StaticResource SettingsButtonStyle}" MinWidth="80" MinHeight="28" Margin="8,0,5,0" IsEnabled="{Binding CanApplyOpacity}" Content="{Binding BulkOpacityPercent}" ContentStringFormat="Apply {0}%" AutomationProperties.Name="Apply displayed opacity to described targets"/>
-                                <Button x:Name="ResetAllOpacityButton" Click="SetAllTo100Percent_Click" Style="{StaticResource SettingsButtonStyle}" Content="All 100%" MinHeight="28" ToolTip="{Binding ResetAllDescription}" AutomationProperties.Name="{Binding ResetAllDescription}"/>
+                                <Button x:Name="ApplyOpacityButton" Click="SetAllTo80Percent_Click" Style="{StaticResource SettingsButtonStyle}" MinWidth="80" IsEnabled="{Binding CanApplyOpacity}" Content="{Binding BulkOpacityPercent}" ContentStringFormat="Apply {0}%" AutomationProperties.Name="Apply displayed opacity to described targets"/>
+                                <Button x:Name="ResetAllOpacityButton" Click="SetAllTo100Percent_Click" Style="{StaticResource SettingsButtonStyle}" Content="All 100%" ToolTip="{Binding ResetAllDescription}" AutomationProperties.Name="{Binding ResetAllDescription}"/>
                             </WrapPanel>
-                            <TextBlock Text="{Binding OpacityTargetDescription}" TextWrapping="Wrap" Foreground="{DynamicResource ForegroundColor}" Margin="0,3,0,0"/>
+                            <controls:IntegerEditor x:Name="BulkOpacityEditor" Label="Bulk opacity" IsSetting="True" IsDeferred="True" Value="{Binding BulkOpacityPercent, Mode=OneWay}" ValueRequested="BulkValueRequested" AutomationProperties.Name="Bulk opacity percent"/>
+                            <TextBlock Text="{Binding OpacityTargetDescription}" TextWrapping="Wrap" Margin="0,3,0,0"/>
                             <TextBlock Text="{Binding ResetAllDescription}" TextWrapping="Wrap" Foreground="{DynamicResource MutedForegroundColor}" FontSize="11"/>
                         </StackPanel>
 
@@ -520,9 +512,6 @@
                                         <Grid Grid.Column="2" Width="150">
                                             <TextBox x:Name="WindowFilterTextBox" AutomationProperties.Name="Search windows by title or process" MinHeight="28"
                                                      Text="{Binding WindowFilterText, UpdateSourceTrigger=PropertyChanged}"
-                                                     Background="{DynamicResource BackgroundColor}"
-                                                     Foreground="{DynamicResource ForegroundColor}"
-                                                     BorderBrush="{DynamicResource BorderColor}"
                                                      FontSize="10"
                                                      VerticalContentAlignment="Center"
                                                      Padding="4,2"/>
@@ -665,42 +654,25 @@
                                                             Tag="{Binding}"/>
                                                 </StackPanel>
 
-                                            <!-- Row 1: グループ一括制御（透明度・サイズ） -->
-                                            <WrapPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,4,0,0">
-                                                <!-- 一括透明度スライダー -->
-                                                <TextBlock Text="Opacity:" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="0,0,4,0"/>
-                                                <Slider SmallChange="1" LargeChange="10" IsSnapToTickEnabled="True" TickFrequency="1" AutomationProperties.Name="Group opacity percent" x:Name="GroupOpacitySlider"
-                                                        Style="{StaticResource ThemedSliderStyle}"
-                                                        Minimum="0" Maximum="100"
-                                                        Value="100"
-                                                        Width="80"
-                                                        VerticalAlignment="Center"
-                                                        ValueChanged="GroupOpacitySlider_ValueChanged"
-                                                        Tag="{Binding}"/>
-                                                <TextBlock Text="%" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="2,0,4,0"/>
-                                                <Button Style="{StaticResource ResetOpacityButtonStyle}"
-                                                        AutomationProperties.Name="Reset group opacity to 100 percent" Click="GroupResetOpacity_Click"
-                                                        Tag="{Binding}"
-                                                        Margin="0,0,10,0"/>
+                                            <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,4,0,0">
+                                                <DockPanel>
+                                                    <Button DockPanel.Dock="Right" Content="Reset 100%" Click="GroupResetOpacity_Click" Tag="{Binding}" Style="{StaticResource SettingsButtonStyle}" AutomationProperties.Name="Reset group opacity to 100 percent"/>
+                                                    <TextBlock Text="{Binding OpacitySummary}" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="11"/>
+                                                </DockPanel>
+                                                <controls:IntegerEditor Label="Set opacity" IsSetting="True" Value="{Binding OpacityTarget, Mode=OneWay}" ValueRequested="GroupValueRequested" AutomationProperties.Name="Group opacity percent"/>
+                                                <WrapPanel Margin="0,3,0,0">
 
-                                                <!-- 一括サイズ設定 -->
-                                                <TextBlock Text="Size:" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="0,0,4,0"/>
+                                                <TextBlock Text="Size (px):" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="0,0,4,0"/>
                                                 <TextBox x:Name="GroupWidthTextBox" AutomationProperties.Name="Group width"
                                                          Width="48" Height="28" FontSize="11"
                                                          Text="800"
                                                          VerticalContentAlignment="Center"
-                                                         Background="{DynamicResource BackgroundColor}"
-                                                         Foreground="{DynamicResource ForegroundColor}"
-                                                         BorderBrush="{DynamicResource BorderColor}"
                                                          Tag="{Binding}"/>
                                                 <TextBlock Text="x" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="2,0,2,0"/>
                                                 <TextBox x:Name="GroupHeightTextBox" AutomationProperties.Name="Group height"
                                                          Width="48" Height="28" FontSize="11"
                                                          Text="600"
                                                          VerticalContentAlignment="Center"
-                                                         Background="{DynamicResource BackgroundColor}"
-                                                         Foreground="{DynamicResource ForegroundColor}"
-                                                         BorderBrush="{DynamicResource BorderColor}"
                                                          Tag="{Binding}"/>
                                                 <Button Content="Apply"
                                                         FontSize="10"
@@ -709,92 +681,26 @@
                                                         AutomationProperties.Name="Apply group size" Click="GroupSizeApply_Click"
                                                         Tag="{Binding}"
                                                         ToolTip="Apply size to all windows in this group"/>
-                                                </WrapPanel>
+                                                                                                </WrapPanel>
+                                            </StackPanel>
                                             </Grid>
                                         </Border>
                                     </HierarchicalDataTemplate>
 
                                     <!-- ウィンドウアイテムのテンプレート -->
                                     <DataTemplate DataType="{x:Type local:WindowInfo}">
-                                        <Grid Margin="0,3" MouseMove="WindowItem_MouseMove" Tag="{Binding}">
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                            </Grid.RowDefinitions>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="180"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-
-                                            <Border x:Name="ActiveBorder" Background="{DynamicResource AccentHighlightColor}" Opacity="0.3" CornerRadius="3" Margin="-2">
-                                                <Border.Style>
-                                                    <Style TargetType="Border">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Border.Style>
-                                            </Border>
-
-                                            <!-- 1行目: タイトル・不透明度・ピン/クリックスルー/連動ドラッグ -->
-                                            <Image Source="{Binding Icon}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" Grid.Column="0" Grid.Row="0"/>
-
-                                            <TextBlock Grid.Column="1" Grid.Row="0" Text="{Binding Title}"
-                                                       VerticalAlignment="Center"
-                                                       TextTrimming="CharacterEllipsis"
-                                                       Foreground="{DynamicResource ForegroundColor}"
-                                                       FontSize="12"/>
-
-                                            <Grid Grid.Column="2" Grid.Row="0" VerticalAlignment="Center">
-                                                <Slider SmallChange="1" LargeChange="10" IsSnapToTickEnabled="True" TickFrequency="1" AutomationProperties.Name="Window opacity percent" Style="{StaticResource ThemedSliderStyle}"
-                                                        Minimum="0" Maximum="100"
-                                                        Value="{Binding Opacity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                        ValueChanged="OpacitySlider_ValueChanged"/>
-                                                <TextBlock Text="{Binding Opacity, StringFormat={}{0}%}"
-                                                           FontSize="9"
-                                                           IsHitTestVisible="False"
-                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                           Foreground="{DynamicResource MutedForegroundColor}"/>
-                                            </Grid>
-
-                                            <ToggleButton Style="{StaticResource PinToggleButtonStyle}"
-                                                          IsChecked="{Binding IsTopMost, Mode=OneWay}"
-                                                          Grid.Column="3" Grid.Row="0"
-                                                          ToolTip="Toggle Always on Top"
-                                                          AutomationProperties.Name="Toggle Always on Top" Click="PinButton_Click"/>
-
-                                            <ToggleButton Style="{StaticResource ClickThroughToggleButtonStyle}"
-                                                          IsChecked="{Binding IsClickThrough, Mode=OneWay}"
-                                                          Grid.Column="4" Grid.Row="0"
-                                                          ToolTip="Toggle Click-Through"
-                                                          AutomationProperties.Name="Toggle Click-Through" Click="ClickThroughButton_Click"/>
-
-                                            <!-- 連動ドラッグに含めるかどうかのトグル -->
-                                            <ToggleButton Style="{StaticResource WindowLinkedDragToggleButtonStyle}"
-                                                          AutomationProperties.Name="Include window in linked drag" IsChecked="{Binding IncludeInLinkedDrag, Mode=TwoWay}"
-                                                          Grid.Column="5" Grid.Row="0"
-                                                          ToolTip="Include in Linked Drag"/>
-
-                                            <!-- 2行目: サイズ調整スライダー（幅・高さ） -->
-                                            <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="5" Orientation="Horizontal" Margin="0,2,0,0">
-                                                <TextBlock Text="Size:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}" Margin="0,0,5,0" FontSize="10"/>
-                                                <TextBlock Text="W" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" Margin="0,0,3,0" FontSize="10"/>
-                                                <Slider SmallChange="1" LargeChange="10" IsSnapToTickEnabled="True" TickFrequency="1" AutomationProperties.Name="Window width" Minimum="200" Maximum="3000"
-                                                        Value="{Binding Width, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                        ValueChanged="WindowWidthSlider_ValueChanged"
-                                                        Width="100"/>
-                                                <TextBlock Text="H" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" Margin="10,0,3,0" FontSize="10"/>
-                                                <Slider SmallChange="1" LargeChange="10" IsSnapToTickEnabled="True" TickFrequency="1" AutomationProperties.Name="Window height" Minimum="200" Maximum="3000"
-                                                        Value="{Binding Height, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                        ValueChanged="WindowHeightSlider_ValueChanged"
-                                                        Width="100"/>
+                                        <Grid Margin="0,5" MouseMove="WindowItem_MouseMove" Tag="{Binding}">
+                                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <Image Source="{Binding Icon}" Width="14" Height="14" Margin="0,0,6,0"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                            <ToggleButton Grid.Column="2" Style="{StaticResource PinToggleButtonStyle}" IsChecked="{Binding IsTopMost, Mode=OneWay}" Click="PinButton_Click" AutomationProperties.Name="Toggle Always on Top" ToolTip="Toggle Always on Top"/>
+                                            <ToggleButton Grid.Column="3" Style="{StaticResource ClickThroughToggleButtonStyle}" IsChecked="{Binding IsClickThrough, Mode=OneWay}" Click="ClickThroughButton_Click" AutomationProperties.Name="Toggle Click-Through" ToolTip="Toggle Click-Through"/>
+                                            <ToggleButton Grid.Column="4" Style="{StaticResource WindowLinkedDragToggleButtonStyle}" IsChecked="{Binding IncludeInLinkedDrag, Mode=TwoWay}" AutomationProperties.Name="Include window in linked drag" ToolTip="Include in linked drag"/>
+                                            <StackPanel Grid.Row="1" Grid.ColumnSpan="5">
+                                                <controls:IntegerEditor Label="Opacity" Value="{Binding Opacity, Mode=OneWay}" Tag="Opacity" ValueRequested="WindowValueRequested" AutomationProperties.Name="Window opacity percent"/>
+                                                <controls:IntegerEditor Label="Width" Unit="px" Minimum="1" Maximum="16384" Value="{Binding Width, Mode=OneWay}" Tag="Width" ValueRequested="WindowValueRequested" AutomationProperties.Name="Window width"/>
+                                                <controls:IntegerEditor Label="Height" Unit="px" Minimum="1" Maximum="16384" Value="{Binding Height, Mode=OneWay}" Tag="Height" ValueRequested="WindowValueRequested" AutomationProperties.Name="Window height"/>
                                             </StackPanel>
                                         </Grid>
                                     </DataTemplate>
@@ -863,7 +769,7 @@
                     </Grid>
                 </TabItem>
                 <TabItem Header="Presets" Style="{DynamicResource ThemedTabItemStyle}">
-                    <Grid Margin="10">
+                    <Grid TextElement.Foreground="{DynamicResource ForegroundColor}" Margin="10">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
@@ -884,7 +790,7 @@
 
                                           Grid.Row="0" Grid.ColumnSpan="2"
                                           Margin="0,0,0,6">
-                                    <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" Foreground="#202020"/></DataTemplate></ComboBox.ItemTemplate>
+                                    <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}"/></DataTemplate></ComboBox.ItemTemplate>
                                 </ComboBox>
                                 <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal">
                                     <Button Content="Apply" Click="ApplyPreset_Click" Style="{StaticResource SettingsButtonStyle}" Width="70"/>
@@ -909,9 +815,7 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Name:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <TextBox AutomationProperties.Name="Name" Grid.Column="1" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
-                                             Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
-                                             BorderBrush="{DynamicResource BorderColor}"/>
+                                    <TextBox AutomationProperties.Name="Name" Grid.Column="1" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
                                 </Grid>
 
                                 <!-- ターゲットフィルタ設定 -->
@@ -922,9 +826,7 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Process:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}" FontSize="11"/>
-                                    <TextBox AutomationProperties.Name="Target Process Name" Grid.Column="1" Text="{Binding TargetProcessName, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
-                                             Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
-                                             BorderBrush="{DynamicResource BorderColor}" FontSize="11"
+                                    <TextBox AutomationProperties.Name="Target Process Name" Grid.Column="1" Text="{Binding TargetProcessName, UpdateSourceTrigger=PropertyChanged}" Margin="5,0" FontSize="11"
                                              ToolTip="プロセス名でフィルタ（例: notepad, chrome）。空欄の場合は全てに適用"/>
                                 </Grid>
                                 <Grid Margin="0,5">
@@ -943,7 +845,7 @@
                                               ToolTip="ターゲットグループを選択。未選択の場合は全てに適用">
                                         <ComboBox.ItemTemplate>
                                             <DataTemplate>
-                                                <TextBlock Text="{Binding Name}" Foreground="#202020"/>
+                                                <TextBlock Text="{Binding Name}"/>
                                             </DataTemplate>
                                         </ComboBox.ItemTemplate>
                                     </ComboBox>
@@ -956,9 +858,7 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Hotkey:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}" FontSize="11"/>
                                     <TextBox AutomationProperties.Name="Hot Key" x:Name="HotKeyTextBox" Grid.Column="1"
-                                             Text="{Binding HotKey, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
-                                             Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
-                                             BorderBrush="{DynamicResource BorderColor}" FontSize="11"
+                                             Text="{Binding HotKey, UpdateSourceTrigger=PropertyChanged}" Margin="5,0" FontSize="11"
                                              ToolTip="ショートカットキー（例: F1, Ctrl+1, Ctrl+Shift+A）"
                                              PreviewKeyDown="HotKeyTextBox_PreviewKeyDown"/>
                                 </Grid>
@@ -972,13 +872,9 @@
                                         <ColumnDefinition Width="80"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Size (WxH):" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <TextBox AutomationProperties.Name="Width" Grid.Column="1" Text="{Binding Width, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
-                                             Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
-                                             BorderBrush="{DynamicResource BorderColor}"/>
+                                    <TextBox AutomationProperties.Name="Width" Grid.Column="1" Text="{Binding Width, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
                                     <TextBlock Grid.Column="2" Text="x" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <TextBox AutomationProperties.Name="Height" Grid.Column="3" Text="{Binding Height, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
-                                             Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
-                                             BorderBrush="{DynamicResource BorderColor}"/>
+                                    <TextBox AutomationProperties.Name="Height" Grid.Column="3" Text="{Binding Height, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
                                 </Grid>
 
                                 <Grid Margin="0,5">
@@ -987,9 +883,8 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Opacity:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <Slider SmallChange="1" LargeChange="10" IsSnapToTickEnabled="True" TickFrequency="1" AutomationProperties.Name="Preset opacity percent" Minimum="0" Maximum="100" Value="{Binding Opacity, UpdateSourceTrigger=PropertyChanged}" Width="150" Margin="5,0"/>
-                                        <TextBlock Text="{Binding Opacity, StringFormat={}{0}%}" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" Margin="5,0"/>
+                                    <StackPanel Grid.Column="1">
+                                        <controls:IntegerEditor Label="Preset opacity" IsSetting="True" IsDeferred="True" Value="{Binding Opacity, Mode=OneWay, TargetNullValue=100}" ValueRequested="PresetValueRequested" AutomationProperties.Name="Preset opacity percent"/>
                                     </StackPanel>
                                 </Grid>
 
@@ -1006,13 +901,9 @@
                                         <ColumnDefinition Width="80"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Offset (X,Y):" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <TextBox AutomationProperties.Name="Cascade Offset X" Grid.Column="1" Text="{Binding CascadeOffsetX, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
-                                             Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
-                                             BorderBrush="{DynamicResource BorderColor}"/>
+                                    <TextBox AutomationProperties.Name="Cascade Offset X" Grid.Column="1" Text="{Binding CascadeOffsetX, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
                                     <TextBlock Grid.Column="2" Text="," VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <TextBox AutomationProperties.Name="Cascade Offset Y" Grid.Column="3" Text="{Binding CascadeOffsetY, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
-                                             Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
-                                             BorderBrush="{DynamicResource BorderColor}"/>
+                                    <TextBox AutomationProperties.Name="Cascade Offset Y" Grid.Column="3" Text="{Binding CascadeOffsetY, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
                                 </Grid>
 
                                 <Grid Margin="0,5" IsEnabled="{Binding EnableCascade}">
@@ -1036,7 +927,7 @@
                 </TabItem>
                 <!-- Layouts タブ -->
                 <TabItem Header="Layouts" Style="{DynamicResource ThemedTabItemStyle}">
-                    <Grid Margin="10">
+                    <Grid TextElement.Foreground="{DynamicResource ForegroundColor}" Margin="10">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
@@ -1057,7 +948,7 @@
 
                                           Grid.Row="0" Grid.ColumnSpan="2"
                                           Margin="0,0,0,6">
-                                    <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" Foreground="#202020"/></DataTemplate></ComboBox.ItemTemplate>
+                                    <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}"/></DataTemplate></ComboBox.ItemTemplate>
                                 </ComboBox>
                                 <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal">
                                     <Button Content="Restore" Click="RestoreLayout_Click" Style="{StaticResource SettingsButtonStyle}" Width="70" ToolTip="選択したレイアウトを復元"/>
@@ -1081,9 +972,7 @@
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Name:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                        <TextBox AutomationProperties.Name="Name" Grid.Column="1" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
-                                                 Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
-                                                 BorderBrush="{DynamicResource BorderColor}"/>
+                                        <TextBox AutomationProperties.Name="Name" Grid.Column="1" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"/>
                                     </Grid>
 
                                     <Grid Margin="0,5">
@@ -1143,7 +1032,7 @@
                     </Grid>
                 </TabItem>
                 <TabItem Header="Settings" Style="{DynamicResource ThemedTabItemStyle}">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
+                    <ScrollViewer TextElement.Foreground="{DynamicResource ForegroundColor}" VerticalScrollBarVisibility="Auto" Margin="10">
                         <StackPanel>
                             <TextBlock Text="Appearance" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource ForegroundColor}" Margin="0,0,0,10"/>
                             <StackPanel Orientation="Horizontal" Margin="0,5,0,15">
@@ -1175,7 +1064,7 @@
 
                                                 <CheckBox Content="{Binding Action}" IsChecked="{Binding IsEnabled}" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource ForegroundColor}"/>
 
-                                                <TextBox AutomationProperties.Name="Keys" Text="{Binding Keys}" Grid.Column="1" IsReadOnly="True" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource ForegroundColor}" Background="{DynamicResource BackgroundColor}"/>
+                                                <TextBox AutomationProperties.Name="Keys" Text="{Binding Keys}" Grid.Column="1" IsReadOnly="True" VerticalAlignment="Center" Margin="0,0,10,0"/>
 
                                                 <Button Content="Edit" Click="EditHotkey_Click" Tag="{Binding}" Grid.Column="2" Style="{StaticResource SettingsButtonStyle}" Width="60"/>
                                             </Grid>
@@ -1192,7 +1081,7 @@
                     </ScrollViewer>
                 </TabItem>
                 <TabItem Header="Help" Style="{DynamicResource ThemedTabItemStyle}">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="15">
+                    <ScrollViewer TextElement.Foreground="{DynamicResource ForegroundColor}" VerticalScrollBarVisibility="Auto" Padding="15">
                         <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource ForegroundColor}" LineHeight="22">
                             <Run Text="Select a window or group in Windows, then use its controls or apply a preset."/><LineBreak/><LineBreak/>
                             <Run Text="Groups: enter a name and choose New Group. The selected window is added. Drag window rows onto group headers to move them. Rename and Delete Group apply to the selected manual group."/><LineBreak/><LineBreak/>
@@ -1205,7 +1094,7 @@
                     </ScrollViewer>
                 </TabItem>
                 <TabItem Header="About" Style="{DynamicResource ThemedTabItemStyle}">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10">
+                    <ScrollViewer TextElement.Foreground="{DynamicResource ForegroundColor}" VerticalScrollBarVisibility="Auto" Margin="10">
                         <StackPanel>
                             <TextBlock Text="WindowSluへようこそ" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
                             <TextBlock Text="このアプリケーションは、ウィンドウの透明度調整や最前面表示を簡単に行うためのツールです。" TextWrapping="Wrap" Margin="0,0,0,15"/>

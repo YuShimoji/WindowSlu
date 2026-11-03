@@ -23,4 +23,12 @@
     <SolidColorBrush x:Key="ScrollBarBackgroundColor" Color="#252526"/>
     <SolidColorBrush x:Key="ScrollBarThumbColor" Color="#4D4D50"/>
 
+    <SolidColorBrush x:Key="InputBackground" Color="#333337"/>
+    <SolidColorBrush x:Key="InputForeground" Color="#E6E6E6"/>
+    <SolidColorBrush x:Key="InputReadOnlyBackground" Color="#29292D"/>
+    <SolidColorBrush x:Key="InputDisabledBackground" Color="#38383E"/>
+    <SolidColorBrush x:Key="InputDisabledForeground" Color="#B7B7BF"/>
+    <SolidColorBrush x:Key="InputSelectionBackground" Color="#145A78"/>
+    <SolidColorBrush x:Key="InputSelectionForeground" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="ErrorForeground" Color="#FF9C9C"/>
 </ResourceDictionary>

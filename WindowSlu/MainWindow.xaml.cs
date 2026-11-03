@@ -11,6 +11,7 @@ using System.Windows.Interop;
 using System.Windows.Threading;
 using System.Windows.Media;
 using WindowSlu.Models;
+using WindowSlu.Controls;
 using WindowSlu.Services;
 using WindowSlu.ViewModels;
 using Button = System.Windows.Controls.Button;
@@ -466,7 +467,7 @@ namespace WindowSlu
                 if (WindowTreeView.ItemContainerGenerator.ContainerFromItem(group) is TreeViewItem parent)
                 {
                     parent.IsExpanded = true; parent.UpdateLayout();
-                    if (parent.ItemContainerGenerator.ContainerFromItem(info) is TreeViewItem row) row.BringIntoView();
+                    if (parent.ItemContainerGenerator.ContainerFromItem(info) is TreeViewItem row) row.BringIntoView(new Rect(0, 0, row.ActualWidth, Math.Min(row.ActualHeight, 100)));
                 }
             }));
         }
@@ -550,13 +551,54 @@ namespace WindowSlu
             finally { _readingWindowState = false; }
         }
 
-        // --- Group Bulk Control Event Handlers ---
-        private void ApplyGroupOpacity(WindowGroup group, int opacity)
+        private void BulkValueRequested(object? sender, IntegerValueRequest e)
+        { _viewModel.BulkOpacityPercent = e.RequestedValue; e.ActualValue = _viewModel.BulkOpacityPercent; e.Success = true; }
+        private void PresetValueRequested(object? sender, IntegerValueRequest e)
         {
+            if (sender is IntegerEditor { DataContext: WindowPreset preset })
+            { preset.Opacity = e.RequestedValue; e.ActualValue = preset.Opacity.Value; e.Success = true; }
+        }
+        private void GroupValueRequested(object? sender, IntegerValueRequest e)
+        {
+            if (_viewModel.IsReadingWindowState || sender is not IntegerEditor { DataContext: WindowGroup group }) return;
+            group.OpacityTarget = e.RequestedValue;
+            var result = ApplyGroupOpacity(group, e.RequestedValue);
+            e.Success = result.Failed == 0; e.ActualValue = group.OpacityTarget; e.Message = group.OpacitySummary;
+        }
+        private void WindowValueRequested(object? sender, IntegerValueRequest e)
+        {
+            if (_readingWindowState || _viewModel.IsReadingWindowState || sender is not IntegerEditor { DataContext: WindowInfo info } editor) return;
+            if (Equals(editor.Tag, "Opacity"))
+            {
+                e.Success = SetTransparency(info.Handle, e.RequestedValue); e.ActualValue = info.Opacity;
+                _viewModel.StatusText = e.Success ? $"'{info.Title}' actual opacity: {info.Opacity}%" : "Could not change opacity; actual value reloaded.";
+            }
+            else
+            {
+                _readingWindowState = true;
+                try
+                {
+                    var before = _viewModel.WindowService.GetWindowPosition(info.Handle);
+                    bool width = Equals(editor.Tag, "Width");
+                    e.Success = _viewModel.WindowService.SetWindowSize(info.Handle, width ? e.RequestedValue : before.Width, width ? before.Height : e.RequestedValue);
+                    _viewModel.WindowService.UpdateWindowPositionInfo(info);
+                    e.ActualValue = width ? info.Width : info.Height;
+                    _viewModel.StatusText = e.Success ? $"'{info.Title}' size: {info.Width} x {info.Height}" : $"Could not resize '{info.Title}'; actual size: {info.Width} x {info.Height}";
+                }
+                finally { _readingWindowState = false; }
+            }
+            e.Message = _viewModel.StatusText; _viewModel.OperationDetails = string.Empty;
+        }
+
+        // --- Group Bulk Control Event Handlers ---
+        private WindowOperationResult ApplyGroupOpacity(WindowGroup group, int opacity)
+        {
+            group.OpacityTarget = opacity;
             var result = new WindowOperationResult();
             foreach (var window in group.Windows)
                 if (SetTransparency(window.Handle, opacity)) result.Succeeded++; else result.Failed++;
             ShowOperationResult($"Group '{group.Name}' opacity", result);
+            return result;
         }
 
         private void GroupOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -575,33 +617,21 @@ namespace WindowSlu
             if (sender is Button button && button.Tag is WindowGroup group)
             {
                 // ボタンの親要素からTextBoxを探す
-                var parent = button.Parent as StackPanel;
+                var parent = button.Parent as Panel;
                 if (parent == null) return;
 
-                int width = 800;
-                int height = 600;
-
-                foreach (var child in parent.Children)
-                {
-                    if (child is TextBox textBox)
-                    {
-                        if (textBox.Name == "GroupWidthTextBox" && int.TryParse(textBox.Text, out int w))
-                        {
-                            width = w;
-                        }
-                        else if (textBox.Name == "GroupHeightTextBox" && int.TryParse(textBox.Text, out int h))
-                        {
-                            height = h;
-                        }
-                    }
-                }
+                var widthBox = parent.Children.OfType<TextBox>().FirstOrDefault(t => t.Name == "GroupWidthTextBox");
+                var heightBox = parent.Children.OfType<TextBox>().FirstOrDefault(t => t.Name == "GroupHeightTextBox");
+                if (!int.TryParse(widthBox?.Text, out int width) || !int.TryParse(heightBox?.Text, out int height) || width <= 0 || height <= 0)
+                { _viewModel.StatusText = "Enter positive whole numbers for both group dimensions (px); no windows were changed."; return; }
 
                 var result = new WindowOperationResult();
                 foreach (var window in group.Windows)
                 {
-                    if (_viewModel.WindowService.SetWindowSize(window.Handle, width, height))
-                    { _viewModel.WindowService.UpdateWindowPositionInfo(window); result.Succeeded++; }
-                    else result.Failed++;
+                    bool changed = _viewModel.WindowService.SetWindowSize(window.Handle, width, height);
+                    _viewModel.WindowService.UpdateWindowPositionInfo(window);
+                    if (changed) result.Succeeded++;
+                    else { result.Failed++; result.Details.Add($"'{window.Title}': actual {window.Width} x {window.Height} px"); }
                 }
                 ShowOperationResult("Group resize", result);
             }
@@ -624,7 +654,7 @@ namespace WindowSlu
                 {
                     if (source is Slider || source is System.Windows.Controls.Primitives.ToggleButton ||
                         source is System.Windows.Controls.Primitives.Thumb || source is Button ||
-                        source is TextBox)
+                        source is TextBox || source is ComboBox || source is IntegerEditor)
                     {
                         return; // コントロール操作中はD&Dしない
                     }
@@ -971,15 +1001,17 @@ namespace WindowSlu
                     Width = 300,
                     Height = 200,
                     WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                    Owner = this,
-                    Background = Background,
-                    Foreground = Foreground
+                    Owner = this
                 };
 
+                dialog.SetResourceReference(Window.BackgroundProperty, "BackgroundColor");
+                dialog.SetResourceReference(Window.ForegroundProperty, "ForegroundColor");
                 var stackPanel = new StackPanel { Margin = new Thickness(10) };
+                stackPanel.SetResourceReference(Panel.BackgroundProperty, "BackgroundColor");
                 var instructionText = new TextBlock
                 {
                     Text = "Press the key combination you want to assign:",
+                    TextWrapping = TextWrapping.Wrap,
                     Margin = new Thickness(0, 0, 0, 10)
                 };
                 stackPanel.Children.Add(instructionText);

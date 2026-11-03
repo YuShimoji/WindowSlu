@@ -1,5 +1,22 @@
 # WindowSlu 開発申し送り
 
+## 2026-11-04 追加依頼：スクショ・通常入口・入力色とスライダー
+
+本人の追加原文はRecordinator依頼 `4525dff7-b75a-4fd0-b411-001099f9adde`（本文版 `01M6HDB2MKW9Y6H61799S7YYRZ`）と[担当Prompt](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-followup-20261104/worker-prompt.txt>)へ保持した。前回の完了を取り消さず、追加分を別Taskとして追跡する。
+
+| 対象（リンク） | 状態 | 確認方法 |
+|---|---|---|
+| [既対応の画面・検証](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-improvement-20261104/worker/RESULT.md>) | ComboBox選択値、28px操作領域、1pxキー操作は対応済み | fd37648のソースと前回51件・CI・描画を再利用 |
+| 入力色の再発防止・スライダーの操作 | 実装担当が追加対応中 | 共通の前景/背景、Dark/Light・候補・追加ダイアログ、各sliderの実値/単位・数値入力・細かいdrag・切りの良い値から実HWND結果まで検証 |
+| [通常入口の既存参照](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-followup-20261104/shortcuts-before.json>) | Start Menuの2リンクは既存bin/Release/.../publishを参照。前回の確認用artifactsとは別版 | ShortcutのTargetPathとexe存在を読戻し。開始時のWindowSluプロセスは0件 |
+| [ローカル反映](<C:/Users/thank/Storage/App Projects/WindowSlu/scripts/Update-LocalApp.ps1>)・[起動](<C:/Users/thank/Storage/App Projects/WindowSlu/scripts/Start-WindowSlu.ps1>) | 親が整備・検証する | 既存exe/設定/リンクを退避し、新版hash・設定非変更・ショートカット読戻し・通常起動を確認。入力試験は専用HWNDのみ |
+
+実装は既存の独立チャット `01a1a29c-a44e-7b01-a4fe-0cc980983f83`（gpt-6.1-sol / high指定を維持）へ渡し、追加ターンの着手を確認した。所有はWindowSlu/、WindowSlu.Tests/、READMEのUI説明とworker証跡、Task `3ef3158f-0f9a-5c16-b00f-4d108838fc69`。GUIも同担当のみが操作する。
+
+親はscripts/、[通常利用・スクショ案内](<C:/Users/thank/Storage/App Projects/WindowSlu/docs/LOCAL_REVIEW.md>)、HANDOVERとTask `9885e382-5c6a-5225-8052-47d213c4924b`を所有する。通常publish先の配置とprofile退避後に担当へ起動先を送り、通常起動・表示を確認してスクショを提出する。
+
+数値の所要時間は約束せず、方式決定と実動作確認後に報告する。既存の未追跡.serena/・CLAUDE.md、既存のリンク・保存設定・前回成果は保持する。
+
 ## 2026-11-04 UI評価に基づく改善（実装・検証・共有完了）
 
 本人原文:「上記について改善のための開発工程を設計し、Recordinatorに登録して、新規スレッドに適切なモデルとエフォートでPromptを与えて作業を完了させてください。」

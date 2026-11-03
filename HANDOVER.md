@@ -7,13 +7,21 @@
 | 対象（リンク） | 状態 | 確認方法 |
 |---|---|---|
 | [既対応の画面・検証](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-improvement-20261104/worker/RESULT.md>) | ComboBox選択値、28px操作領域、1pxキー操作は対応済み | fd37648のソースと前回51件・CI・描画を再利用 |
-| 入力色の再発防止・スライダーの操作 | 実装担当が追加対応中 | 共通の前景/背景、Dark/Light・候補・追加ダイアログ、各sliderの実値/単位・数値入力・細かいdrag・切りの良い値から実HWND結果まで検証 |
+| [入力色の再発防止・スライダーの操作](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-followup-20261104/worker/RESULT.md>) | 実装・描画・実動作確認完了 | 共通の前景/背景、Dark/Light・候補・追加ダイアログ、各sliderの実値/単位・数値入力・細かいdrag・切りの良い値から実HWND結果まで検証 |
 | [通常入口の既存参照](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-followup-20261104/shortcuts-before.json>) | Start Menuの2リンクは既存bin/Release/.../publishを参照。前回の確認用artifactsとは別版 | ShortcutのTargetPathとexe存在を読戻し。開始時のWindowSluプロセスは0件 |
-| [ローカル反映](<C:/Users/thank/Storage/App Projects/WindowSlu/scripts/Update-LocalApp.ps1>)・[起動](<C:/Users/thank/Storage/App Projects/WindowSlu/scripts/Start-WindowSlu.ps1>) | 親が整備・検証する | 既存exe/設定/リンクを退避し、新版hash・設定非変更・ショートカット読戻し・通常起動を確認。入力試験は専用HWNDのみ |
+| [ローカル反映](<C:/Users/thank/Storage/App Projects/WindowSlu/scripts/Update-LocalApp.ps1>)・[起動](<C:/Users/thank/Storage/App Projects/WindowSlu/scripts/Start-WindowSlu.ps1>) | 通常起動・実画像まで完了。更新AGENTS 14節に従いWorkerが実行 | 旧版/設定/リンクを退避し、新版hash・設定4file非変更・リンク読戻しを確認。Startメニュー実リンクから起動し同じPIDをscriptで取得、応答回復・2タブ表示を確認 |
 
 実装は既存の独立チャット `01a1a29c-a44e-7b01-a4fe-0cc980983f83`（gpt-6.1-sol / high指定を維持）へ渡し、追加ターンの着手を確認した。所有はWindowSlu/、WindowSlu.Tests/、READMEのUI説明とworker証跡、Task `3ef3158f-0f9a-5c16-b00f-4d108838fc69`。GUIも同担当のみが操作する。
 
-親はscripts/、[通常利用・スクショ案内](<C:/Users/thank/Storage/App Projects/WindowSlu/docs/LOCAL_REVIEW.md>)、HANDOVERとTask `9885e382-5c6a-5225-8052-47d213c4924b`を所有する。通常publish先の配置とprofile退避後に担当へ起動先を送り、通常起動・表示を確認してスクショを提出する。
+親は[通常利用・スクショ案内](<C:/Users/thank/Storage/App Projects/WindowSlu/docs/LOCAL_REVIEW.md>)、HANDOVERとTask `9885e382-5c6a-5225-8052-47d213c4924b`の全体レビュー・返却を所有する。更新AGENTS 14節を受領後、scripts/の所有と通常publish先への配置・profile退避・通常起動の実行は既存Workerへ移管した。担当へ規則原文と既存準備の観察を送信済み。
+
+選択文字の描画修正・実HWND操作・525×700のスクロール到達・通常入口反映と実画像を受領し、親も配色/配置/通常版画像と配置exeのSHA256、設定4file非変更を独立照合した。全52件のCIが成功し、技術上の残件はない。Recordinatorへ両担当の結果を戻し、本文でスクショを提出して返却する。新しい大きな配置変更は行わず、途中に提示した画像と最終実装画像を区別する。
+
+製品コミットは[02172db](https://github.com/YuShimoji/WindowSlu/commit/02172dbeb25f0b96c269a7a55f8025392a64a13e)、テストのCI前提修正は[93963e2](https://github.com/YuShimoji/WindowSlu/commit/93963e27ad981396ae5ed3c723e995f20a9716e2)。[最終CI](https://github.com/YuShimoji/WindowSlu/actions/runs/41718077921)は52件成功。ローカルで固定400msの連動判定が失敗したため実結果を期限付きで待つ検査へ直し、native 2件が成功した。CIではメニューのfocusとhighlightの同一視を、同じ共有Styleを使うWPF正式状態の検査へ修正し、製品側の動作・配布物は変えていない。
+
+[配布同一性](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-followup-20261104/worker/publish-verification.json>)の製品treeは36606723d81189e7014abae91ecaca6a3d7d2d48、ProductVersionは製品コミットを含む。配置exeのSHA256は0958A1E7DDC67278757F7AE51795F39BC59220FCE05F9EFAC1B6486F84F6100A。[通常起動の最終確認](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-followup-20261104/worker/normal-ready-verification.json>)はPID 27932、responding=true、2タブ視認と設定4file非変更。起動直後のfalseは回復後の確認で更新した。旧版・設定・リンクは[反映記録](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-followup-20261104/launch/install-receipt.json>)の退避先へ保持した。
+
+未確認: Desktop上のアイコンの視認（リンク保存・TargetPath・Startメニュー実リンク起動は確認済み）、全DPI/全外部アプリ/スクリーンリーダーでの使用、本人の使いやすさの採否。これらを技術検証やRecordinatorのdoneで代替しない。
 
 数値の所要時間は約束せず、方式決定と実動作確認後に報告する。既存の未追跡.serena/・CLAUDE.md、既存のリンク・保存設定・前回成果は保持する。
 

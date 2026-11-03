@@ -34,3 +34,5 @@
 | [配布版の同一性](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-followup-20261104/worker/publish-verification.json>) | 製品コミット02172db、自己完結single-file | ProductVersionに同コミットを含む。SHA256は0958A1E7DDC67278757F7AE51795F39BC59220FCE05F9EFAC1B6486F84F6100A |
 
 実行ファイルは[通常のWindowSlu.exe](<C:/Users/thank/Storage/App Projects/WindowSlu/WindowSlu/bin/Release/net10.0-windows/win-x64/publish/WindowSlu.exe>)。通常のデスクトップ入口は[WindowSluショートカット](<C:/Users/thank/OneDrive/デスクトップ/WindowSlu.lnk>)。旧版と設定は反映記録に記載したバックアップ先へ保存した。
+
+未確認: Desktop上でのアイコンの見え方、通常プロファイルのグローバルホットキー動作（起動ログにWin32 1409の登録競合あり）、本人の使い心地。今回の通常画面確認ではホットキー成功を主張しない。

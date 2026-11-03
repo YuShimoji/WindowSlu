@@ -21,7 +21,7 @@
 
 [配布同一性](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-followup-20261104/worker/publish-verification.json>)の製品treeは36606723d81189e7014abae91ecaca6a3d7d2d48、ProductVersionは製品コミットを含む。配置exeのSHA256は0958A1E7DDC67278757F7AE51795F39BC59220FCE05F9EFAC1B6486F84F6100A。[通常起動の最終確認](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-followup-20261104/worker/normal-ready-verification.json>)はPID 27932、responding=true、2タブ視認と設定4file非変更。起動直後のfalseは回復後の確認で更新した。旧版・設定・リンクは[反映記録](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-followup-20261104/launch/install-receipt.json>)の退避先へ保持した。
 
-未確認: Desktop上のアイコンの視認（リンク保存・TargetPath・Startメニュー実リンク起動は確認済み）、全DPI/全外部アプリ/スクリーンリーダーでの使用、本人の使いやすさの採否。これらを技術検証やRecordinatorのdoneで代替しない。
+未確認: Desktop上のアイコンの視認（リンク保存・TargetPath・Startメニュー実リンク起動は確認済み）、グローバルホットキーの通常動作（通常起動ログにWin32 1409の登録競合あり）、全DPI/全外部アプリ/スクリーンリーダーでの使用、本人の使いやすさの採否。これらを技術検証やRecordinatorのdoneで代替しない。
 
 数値の所要時間は約束せず、方式決定と実動作確認後に報告する。既存の未追跡.serena/・CLAUDE.md、既存のリンク・保存設定・前回成果は保持する。
 

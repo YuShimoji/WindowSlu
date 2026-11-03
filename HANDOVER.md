@@ -1,6 +1,6 @@
 # WindowSlu 開発申し送り
 
-## 2026-11-04 UI評価に基づく改善（工程設計・担当起動準備）
+## 2026-11-04 UI評価に基づく改善（工程登録・実装チャット起動）
 
 本人原文:「上記について改善のための開発工程を設計し、Recordinatorに登録して、新規スレッドに適切なモデルとエフォートでPromptを与えて作業を完了させてください。」
 
@@ -15,7 +15,7 @@
 
 同じMainWindow・選択状態を変更するため実装は独立チャット1件に集約する。親が直接行うと、実装・検証を含め数十回規模のツール操作になる見込みであり、短い内部補助へ分解しない。親は工程、Recordinator、HANDOVER、レビュー・統合を所有し、Workerは `WindowSlu/`、`WindowSlu.Tests/`、READMEと専用証跡を所有する。互いに他者の変更をrevertしない。GUI担当は実装Workerのみ。
 
-新規チャットの推奨構成は実装用標準モデルgpt-6.1-sol / high。本人が選択肢「gpt-6.1-sol / highで起動する（推奨）」を選択済み。指定値・作成結果・実行内部値は分けて記録する。現時点では作成前であり実行中とはしない。時間の比較可能な実績がないため数値の所要時間見込みは置かず、正確さの実装終了時と統合検証終了時に報告する。
+新規チャットの推奨構成は実装用標準モデルgpt-6.1-sol / high。本人が選択肢「gpt-6.1-sol / highで起動する（推奨）」を選択済み。指定値・作成結果・実行内部値は分けて記録する。独立チャット `01a1a29c-a44e-7b01-a4fe-0cc980983f83`（host local）を作成済み。作成ツールへgpt-6.1-sol / highを指定し受付成功。実行内部設定は未取得。実際の着手はチャットの進捗を確認して判定する。時間の比較可能な実績がないため数値の所要時間見込みは置かず、正確さの実装終了時と統合検証終了時に報告する。
 
 Recordinator: 通常アイコンのCLI `D:/Recordinator/outputs/desktop-normal/.venv/Scripts/recordinator.exe`、Home `C:/Users/thank/AppData/Local/Packages/Claude_pzs8sxrjxfjjc/LocalCache/Local/Recordinator`、Project `p7dae6c4876`。依頼 `3528158e-14e0-4884-83e3-9f879a37045c`、本文版 `01M6H9KE3NGDA11Y45Z2FBY9TG`。保存はlegacy_localで、別端末同期・本人の成果受入とは区別する。Task作成は担当の着手や完了を意味しない。
 

@@ -190,7 +190,12 @@ internal static class UiFollowupScenarios
             var values = ((Button)valueEditor.FindName("ValuesButton")).ContextMenu;
             values.UpdateLayout();
             foreach (var valueItem in values.Items.OfType<MenuItem>()) Assert.True(Contrast(valueItem.Foreground, valueItem.Background) >= 4.5);
-            var highlight = (MenuItem)values.Items[0]; highlight.Focus(); Pump(palette);
+            // CI may not grant foreground keyboard focus to a popup. Exercise the
+            // shared style's real highlight state independently of OS activation.
+            var highlight = new MenuHighlightProbe { Header = ((MenuItem)values.Items[0]).Header,
+                Style = (Style)values.FindResource(typeof(MenuItem)) };
+            values.Items[0] = highlight; Pump(palette);
+            highlight.ShowHighlight(); values.UpdateLayout();
             Assert.True(highlight.IsHighlighted); Assert.True(Contrast(highlight.Foreground, highlight.Background) >= 4.5);
             Assert.True(Contrast(Visuals<TextBlock>(highlight).First(t => t.Text.Contains("640")).Foreground, highlight.Background) >= 4.5);
             if (directory != null) Capture(values, Path.Combine(directory, $"values-highlight-{theme}-fixture.png"));
@@ -198,6 +203,11 @@ internal static class UiFollowupScenarios
         }
         finally { palette.Close(); }
     }
+    private sealed class MenuHighlightProbe : MenuItem
+    {
+        public void ShowHighlight() => IsHighlighted = true;
+    }
+
     private static void AssertSelectedTextInk(TextBox field)
     {
         int width = (int)Math.Ceiling(field.ActualWidth), height = (int)Math.Ceiling(field.ActualHeight);

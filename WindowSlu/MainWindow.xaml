@@ -14,9 +14,17 @@
         ResizeMode="CanResizeWithGrip">
 
     <Window.Resources>
+        <Style TargetType="TextBox"><Setter Property="Background" Value="{DynamicResource ControlColor}"/><Setter Property="Foreground" Value="{DynamicResource ForegroundColor}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/><Setter Property="MinHeight" Value="28"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="ItemTemplate"><Setter.Value><DataTemplate><TextBlock Text="{Binding}" Foreground="#202020"/></DataTemplate></Setter.Value></Setter>
+            <Setter Property="MinHeight" Value="28"/>
+            <Setter Property="Foreground" Value="#202020"/>
+            <Setter Property="Background" Value="#FFFFFF"/>
+        </Style>
+        <Style TargetType="Slider"><Setter Property="MinHeight" Value="28"/></Style>
         <converters:BoolToTopMostTextConverter x:Key="BoolToTopMostTextConverter"/>
         <converters:PercentToWidthMultiConverter x:Key="PercentToWidthMultiConverter"/>
-        
+
         <!-- CascadeDirection enum values for ComboBox -->
         <ObjectDataProvider x:Key="CascadeDirectionValues" MethodName="GetValues" ObjectType="{x:Type local:CascadeDirection}">
             <ObjectDataProvider.MethodParameters>
@@ -30,7 +38,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Border Background="Transparent" Width="16" Height="16">
+                        <Border Background="Transparent" Width="26" Height="28">
                             <Path x:Name="ExpandPath"
                                   HorizontalAlignment="Center"
                                   VerticalAlignment="Center"
@@ -87,7 +95,8 @@
         <!-- Settings button style (for main content buttons) -->
         <Style x:Key="SettingsButtonStyle" TargetType="Button">
             <Setter Property="Margin" Value="0,0,5,0"/>
-            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="Padding" Value="6,3"/>
+            <Setter Property="MinHeight" Value="28"/>
             <Setter Property="Foreground" Value="{DynamicResource ForegroundColor}"/>
             <Setter Property="Background" Value="{DynamicResource ControlColor}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
@@ -145,7 +154,7 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-        
+
         <!-- Icon ToggleButton Style -->
         <Style x:Key="IconToggleButtonStyle" TargetType="ToggleButton">
             <Setter Property="Background" Value="Transparent"/>
@@ -160,7 +169,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="Bd" 
+                        <Border x:Name="Bd"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
@@ -188,7 +197,7 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-        
+
         <!-- Pinned Toggle Button Style -->
         <Style x:Key="PinToggleButtonStyle" TargetType="ToggleButton" BasedOn="{StaticResource IconToggleButtonStyle}">
             <Setter Property="Content" Value="📌"/>
@@ -215,7 +224,7 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-        
+
         <!-- Linked Drag Toggle Button Style (for group header) -->
         <Style x:Key="LinkedDragToggleButtonStyle" TargetType="ToggleButton" BasedOn="{StaticResource IconToggleButtonStyle}">
             <Setter Property="Content" Value="🔗"/>
@@ -277,7 +286,7 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-        
+
         <!-- Themed Slider Style -->
         <ControlTemplate x:Key="SliderThumbStyle" TargetType="Thumb">
             <Grid Background="Transparent">
@@ -296,8 +305,9 @@
                 </Trigger>
             </ControlTemplate.Triggers>
         </ControlTemplate>
-        
+
         <Style x:Key="ThemedSliderStyle" TargetType="Slider">
+            <Setter Property="MinHeight" Value="28"/>
             <Setter Property="Foreground" Value="{DynamicResource HighlightColor}"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -329,8 +339,8 @@
                                 <Track.Thumb>
                                     <Thumb x:Name="Thumb"
                                            Focusable="False"
-                                           Height="20"
-                                           Width="20"
+                                           Height="28"
+                                           Width="28"
                                            OverridesDefaultStyle="True"
                                            Template="{StaticResource SliderThumbStyle}"
                                            VerticalAlignment="Center"/>
@@ -352,9 +362,9 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
-                        <Border x:Name="Border" 
+                        <Border x:Name="Border"
                                 Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="0,0,0,1"
                                 Margin="0,0,-1,0">
                             <ContentPresenter x:Name="ContentSite"
@@ -390,11 +400,11 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
                             <TabPanel Grid.Row="0" IsItemsHost="True" Background="Transparent"/>
-                            <Border Grid.Row="1" 
-                                    Background="{DynamicResource BackgroundColor}" 
-                                    BorderBrush="{DynamicResource BorderColor}" 
+                            <Border Grid.Row="1"
+                                    Background="{DynamicResource BackgroundColor}"
+                                    BorderBrush="{DynamicResource BorderColor}"
                                     BorderThickness="0,1,0,0">
-                                <ContentPresenter ContentSource="SelectedContent"/>
+                                <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent"/>
                             </Border>
                         </Grid>
                     </ControlTemplate>
@@ -416,7 +426,7 @@
         </tb:TaskbarIcon>
 
     </Window.Resources>
-    
+
     <Border Background="{DynamicResource BackgroundColor}"
             BorderBrush="{DynamicResource BorderColor}"
             BorderThickness="1"
@@ -440,13 +450,13 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                
+
                 <Image Source="/WindowSlu;component/Assets/WindowSlu.ico" Width="16" Height="16" Margin="5" Grid.Column="0"/>
-                
-                <TextBlock Grid.Column="1" 
-                           Text="WindowSlu" 
+
+                <TextBlock Grid.Column="1"
+                           Text="WindowSlu"
                            Foreground="{DynamicResource ForegroundColor}"
-                           VerticalAlignment="Center" 
+                           VerticalAlignment="Center"
                            HorizontalAlignment="Left"
                            Margin="5,0"/>
 
@@ -456,9 +466,9 @@
                 <Button Grid.Column="5" Content="&#xE739;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource TitleBarButtonStyle}" Click="MaximizeButton_Click"/>
                 <Button Grid.Column="6" Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource TitleBarButtonStyle}" Click="CloseButton_Click"/>
             </Grid>
-            
+
             <!-- Main Content -->
-            <TabControl Grid.Row="1" Style="{DynamicResource ThemedTabControlStyle}">
+            <TabControl x:Name="MainTabs" Grid.Row="1" Style="{DynamicResource ThemedTabControlStyle}">
                 <TabItem Header="Windows" Style="{DynamicResource ThemedTabItemStyle}">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -466,54 +476,17 @@
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <!-- コントロールバー -->
-                        <Grid Grid.Row="0" Margin="10,10,10,5">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
-                            <!-- 左側: 一括不透明度設定 -->
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="Bulk opacity:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}" Margin="0,0,5,0"/>
-                                <Slider Style="{StaticResource ThemedSliderStyle}"
-                                        Minimum="0" Maximum="100"
-                                        Value="{Binding BulkOpacityPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                        Width="120"/>
-                                <!-- 現在のBulk opacityを全ウィンドウに適用（小さなアイコンボタン） -->
-                                <Button Click="SetAllTo80Percent_Click"
-                                        Style="{StaticResource SettingsButtonStyle}"
-                                        Width="72"
-                                        Height="24"
-                                        Margin="12,0,0,0"
-                                        ToolTip="Apply current bulk opacity to all windows">
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <TextBlock Text="&#xE8FB;"
-                                                   FontFamily="Segoe MDL2 Assets"
-                                                   FontSize="14"
-                                                   Margin="0,0,4,0"
-                                                   Foreground="{DynamicResource AccentColor}"/>
-                                        <TextBlock Text="{Binding BulkOpacityPercent, StringFormat={}{0}%}"
-                                                   VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource AccentColor}"/>
-                                    </StackPanel>
-                                </Button>
-                            </StackPanel>
-
-                            <!-- 右側: リセットボタン（100%） -->
-                            <Button Grid.Column="1"
-                                    Click="SetAllTo100Percent_Click"
-                                    Style="{StaticResource SettingsButtonStyle}"
-                                    Width="70"
-                                    Height="24"
-                                    HorizontalAlignment="Right"
-                                    ToolTip="Reset opacity of all windows to 100%">
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="14" Margin="0,0,4,0" Foreground="{DynamicResource AccentColor}"/>
-                                    <TextBlock Text="100%" Foreground="{DynamicResource AccentColor}"/>
-                                </StackPanel>
-                            </Button>
-                        </Grid>
+                        <StackPanel Grid.Row="0" Margin="10,8,10,5">
+                            <WrapPanel VerticalAlignment="Center">
+                                <CheckBox x:Name="AllOpacityTargets" Content="All windows" IsChecked="{Binding ApplyToAllWindows}" VerticalAlignment="Center" Margin="0,0,10,0" MinHeight="28" AutomationProperties.Name="Apply opacity to all managed windows"/>
+                                <TextBlock Text="Opacity:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}" Margin="0,0,5,0"/>
+                                <Slider SmallChange="1" LargeChange="10" IsSnapToTickEnabled="True" TickFrequency="1" x:Name="BulkOpacitySlider" Style="{StaticResource ThemedSliderStyle}" Minimum="0" Maximum="100" Value="{Binding BulkOpacityPercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="100" AutomationProperties.Name="Bulk opacity percent"/>
+                                <Button x:Name="ApplyOpacityButton" Click="SetAllTo80Percent_Click" Style="{StaticResource SettingsButtonStyle}" MinWidth="80" MinHeight="28" Margin="8,0,5,0" IsEnabled="{Binding CanApplyOpacity}" Content="{Binding BulkOpacityPercent}" ContentStringFormat="Apply {0}%" AutomationProperties.Name="Apply displayed opacity to described targets"/>
+                                <Button x:Name="ResetAllOpacityButton" Click="SetAllTo100Percent_Click" Style="{StaticResource SettingsButtonStyle}" Content="All 100%" MinHeight="28" ToolTip="{Binding ResetAllDescription}" AutomationProperties.Name="{Binding ResetAllDescription}"/>
+                            </WrapPanel>
+                            <TextBlock Text="{Binding OpacityTargetDescription}" TextWrapping="Wrap" Foreground="{DynamicResource ForegroundColor}" Margin="0,3,0,0"/>
+                            <TextBlock Text="{Binding ResetAllDescription}" TextWrapping="Wrap" Foreground="{DynamicResource MutedForegroundColor}" FontSize="11"/>
+                        </StackPanel>
 
                         <Grid Grid.Row="1">
                             <Grid.RowDefinitions>
@@ -545,7 +518,7 @@
                                                    Margin="4,0,0,0"
                                                    Grid.Column="1"/>
                                         <Grid Grid.Column="2" Width="150">
-                                            <TextBox x:Name="WindowFilterTextBox"
+                                            <TextBox x:Name="WindowFilterTextBox" AutomationProperties.Name="Search windows by title or process" MinHeight="28"
                                                      Text="{Binding WindowFilterText, UpdateSourceTrigger=PropertyChanged}"
                                                      Background="{DynamicResource BackgroundColor}"
                                                      Foreground="{DynamicResource ForegroundColor}"
@@ -583,7 +556,7 @@
                                         <TextBlock Grid.Column="1" Text="Title" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource MutedForegroundColor}"/>
                                         <TextBlock Grid.Column="2" Text="Process" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource MutedForegroundColor}" Margin="8,0,0,0"/>
                                     </Grid>
-                                    <ListView x:Name="AllWindowsListView" ItemsSource="{Binding FilteredWindows}" SelectionChanged="WindowListView_SelectionChanged"
+                                    <ListView x:Name="AllWindowsListView" AutomationProperties.Name="Search results" ItemsSource="{Binding FilteredWindows}" SelectionChanged="WindowListView_SelectionChanged"
                                               Background="Transparent"
                                               BorderThickness="0"
                                               ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -626,7 +599,7 @@
                             <DockPanel Grid.Row="2">
                                 <WrapPanel DockPanel.Dock="Top" Margin="0,4,0,8">
                                     <TextBlock Text="Group name:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                    <TextBox x:Name="GroupNameTextBox" Width="140" Margin="0,0,5,0" ToolTip="Name for a new or selected manual group"/>
+                                    <TextBox x:Name="GroupNameTextBox" AutomationProperties.Name="Group name" Width="140" Margin="0,0,5,0" ToolTip="Name for a new or selected manual group"/>
                                     <Button Content="New Group" Click="NewGroup_Click" Style="{StaticResource SettingsButtonStyle}"/>
                                     <Button Content="Rename" Click="RenameGroup_Click" Style="{StaticResource SettingsButtonStyle}"/>
                                     <Button Content="Delete Group" Click="DeleteGroup_Click" Style="{StaticResource SettingsButtonStyle}"/>
@@ -643,7 +616,7 @@
                                             ToolTip="{Binding SplitTargetDescription}" ToolTipService.ShowOnDisabled="True"/>
                                 </WrapPanel>
                             <TreeView
-                                      x:Name="WindowTreeView"
+                                      x:Name="WindowTreeView" AutomationProperties.Name="Window controls"
                                       ItemsSource="{Binding WindowGroups}"
                                       Background="Transparent"
                                       BorderThickness="0"
@@ -653,11 +626,11 @@
                                 <TreeView.Resources>
                                     <!-- グループヘッダーのテンプレート -->
                                     <HierarchicalDataTemplate DataType="{x:Type local:WindowGroup}" ItemsSource="{Binding Windows}">
-                                        <Border Background="{DynamicResource CardBackgroundColor}" 
-                                                BorderBrush="{DynamicResource BorderColor}" 
-                                                BorderThickness="0,0,0,2" 
-                                                CornerRadius="4" 
-                                                Padding="8,6" 
+                                        <Border Background="{DynamicResource CardBackgroundColor}"
+                                                BorderBrush="{DynamicResource BorderColor}"
+                                                BorderThickness="0,0,0,2"
+                                                CornerRadius="4"
+                                                Padding="8,6"
                                                 Margin="0,4,0,2"
                                                 AllowDrop="True" Drop="GroupHeader_Drop" DragOver="GroupHeader_DragOver" Tag="{Binding}">
                                             <Grid>
@@ -673,7 +646,7 @@
 
                                                 <!-- Row 0: グループ名・連動ドラッグ・カスケード -->
                                                 <Image Source="{Binding GroupIcon}" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center" Grid.Column="0" Grid.Row="0"/>
-                                                
+
                                                 <TextBlock Grid.Column="1" Grid.Row="0" VerticalAlignment="Center">
                                                     <Run Text="{Binding Name, Mode=OneWay}" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource ForegroundColor}"/>
                                                     <Run Text=" (" Foreground="{DynamicResource MutedForegroundColor}"/>
@@ -684,21 +657,21 @@
                                                 <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal">
                                                     <!-- 連動ドラッグ有効/無効トグル -->
                                                     <ToggleButton Style="{StaticResource LinkedDragToggleButtonStyle}"
-                                                                  IsChecked="{Binding LinkedDragEnabled, Mode=TwoWay}"
+                                                                  AutomationProperties.Name="Enable group linked drag" IsChecked="{Binding LinkedDragEnabled, Mode=TwoWay}"
                                                                   ToolTip="Enable Linked Drag for this group"/>
                                                     <!-- Cascadeアイコンボタン -->
                                                     <Button Style="{StaticResource CascadeButtonStyle}"
-                                                            Click="CascadeButton_Click"
+                                                            AutomationProperties.Name="Cascade group" Click="CascadeButton_Click"
                                                             Tag="{Binding}"/>
                                                 </StackPanel>
 
                                             <!-- Row 1: グループ一括制御（透明度・サイズ） -->
-                                            <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,4,0,0">
+                                            <WrapPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,4,0,0">
                                                 <!-- 一括透明度スライダー -->
                                                 <TextBlock Text="Opacity:" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="0,0,4,0"/>
-                                                <Slider x:Name="GroupOpacitySlider"
+                                                <Slider SmallChange="1" LargeChange="10" IsSnapToTickEnabled="True" TickFrequency="1" AutomationProperties.Name="Group opacity percent" x:Name="GroupOpacitySlider"
                                                         Style="{StaticResource ThemedSliderStyle}"
-                                                        Minimum="0" Maximum="100" 
+                                                        Minimum="0" Maximum="100"
                                                         Value="100"
                                                         Width="80"
                                                         VerticalAlignment="Center"
@@ -706,14 +679,14 @@
                                                         Tag="{Binding}"/>
                                                 <TextBlock Text="%" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="2,0,4,0"/>
                                                 <Button Style="{StaticResource ResetOpacityButtonStyle}"
-                                                        Click="GroupResetOpacity_Click"
+                                                        AutomationProperties.Name="Reset group opacity to 100 percent" Click="GroupResetOpacity_Click"
                                                         Tag="{Binding}"
                                                         Margin="0,0,10,0"/>
-                                                
+
                                                 <!-- 一括サイズ設定 -->
                                                 <TextBlock Text="Size:" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="0,0,4,0"/>
-                                                <TextBox x:Name="GroupWidthTextBox"
-                                                         Width="45" Height="18" FontSize="10"
+                                                <TextBox x:Name="GroupWidthTextBox" AutomationProperties.Name="Group width"
+                                                         Width="48" Height="28" FontSize="11"
                                                          Text="800"
                                                          VerticalContentAlignment="Center"
                                                          Background="{DynamicResource BackgroundColor}"
@@ -721,22 +694,22 @@
                                                          BorderBrush="{DynamicResource BorderColor}"
                                                          Tag="{Binding}"/>
                                                 <TextBlock Text="x" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" FontSize="10" Margin="2,0,2,0"/>
-                                                <TextBox x:Name="GroupHeightTextBox"
-                                                         Width="45" Height="18" FontSize="10"
+                                                <TextBox x:Name="GroupHeightTextBox" AutomationProperties.Name="Group height"
+                                                         Width="48" Height="28" FontSize="11"
                                                          Text="600"
                                                          VerticalContentAlignment="Center"
                                                          Background="{DynamicResource BackgroundColor}"
                                                          Foreground="{DynamicResource ForegroundColor}"
                                                          BorderBrush="{DynamicResource BorderColor}"
                                                          Tag="{Binding}"/>
-                                                <Button Content="Apply" 
-                                                        FontSize="10" 
-                                                        Width="40" Height="22" Padding="2,0"
+                                                <Button Content="Apply"
+                                                        FontSize="10"
+                                                        Width="48" Height="28" Padding="2,0"
                                                         Margin="4,0,0,0"
-                                                        Click="GroupSizeApply_Click"
+                                                        AutomationProperties.Name="Apply group size" Click="GroupSizeApply_Click"
                                                         Tag="{Binding}"
                                                         ToolTip="Apply size to all windows in this group"/>
-                                                </StackPanel>
+                                                </WrapPanel>
                                             </Grid>
                                         </Border>
                                     </HierarchicalDataTemplate>
@@ -772,40 +745,40 @@
 
                                             <!-- 1行目: タイトル・不透明度・ピン/クリックスルー/連動ドラッグ -->
                                             <Image Source="{Binding Icon}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" Grid.Column="0" Grid.Row="0"/>
-                                            
-                                            <TextBlock Grid.Column="1" Grid.Row="0" Text="{Binding Title}" 
-                                                       VerticalAlignment="Center" 
-                                                       TextTrimming="CharacterEllipsis" 
+
+                                            <TextBlock Grid.Column="1" Grid.Row="0" Text="{Binding Title}"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis"
                                                        Foreground="{DynamicResource ForegroundColor}"
                                                        FontSize="12"/>
 
                                             <Grid Grid.Column="2" Grid.Row="0" VerticalAlignment="Center">
-                                                <Slider Style="{StaticResource ThemedSliderStyle}"
-                                                        Minimum="0" Maximum="100" 
+                                                <Slider SmallChange="1" LargeChange="10" IsSnapToTickEnabled="True" TickFrequency="1" AutomationProperties.Name="Window opacity percent" Style="{StaticResource ThemedSliderStyle}"
+                                                        Minimum="0" Maximum="100"
                                                         Value="{Binding Opacity, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                         ValueChanged="OpacitySlider_ValueChanged"/>
-                                                <TextBlock Text="{Binding Opacity, StringFormat={}{0}%}" 
+                                                <TextBlock Text="{Binding Opacity, StringFormat={}{0}%}"
                                                            FontSize="9"
                                                            IsHitTestVisible="False"
                                                            HorizontalAlignment="Center" VerticalAlignment="Center"
                                                            Foreground="{DynamicResource MutedForegroundColor}"/>
                                             </Grid>
-                                            
-                                            <ToggleButton Style="{StaticResource PinToggleButtonStyle}" 
+
+                                            <ToggleButton Style="{StaticResource PinToggleButtonStyle}"
                                                           IsChecked="{Binding IsTopMost, Mode=OneWay}"
                                                           Grid.Column="3" Grid.Row="0"
                                                           ToolTip="Toggle Always on Top"
-                                                          Click="PinButton_Click"/>
+                                                          AutomationProperties.Name="Toggle Always on Top" Click="PinButton_Click"/>
 
                                             <ToggleButton Style="{StaticResource ClickThroughToggleButtonStyle}"
                                                           IsChecked="{Binding IsClickThrough, Mode=OneWay}"
                                                           Grid.Column="4" Grid.Row="0"
                                                           ToolTip="Toggle Click-Through"
-                                                          Click="ClickThroughButton_Click"/>
+                                                          AutomationProperties.Name="Toggle Click-Through" Click="ClickThroughButton_Click"/>
 
                                             <!-- 連動ドラッグに含めるかどうかのトグル -->
                                             <ToggleButton Style="{StaticResource WindowLinkedDragToggleButtonStyle}"
-                                                          IsChecked="{Binding IncludeInLinkedDrag, Mode=TwoWay}"
+                                                          AutomationProperties.Name="Include window in linked drag" IsChecked="{Binding IncludeInLinkedDrag, Mode=TwoWay}"
                                                           Grid.Column="5" Grid.Row="0"
                                                           ToolTip="Include in Linked Drag"/>
 
@@ -813,12 +786,12 @@
                                             <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="5" Orientation="Horizontal" Margin="0,2,0,0">
                                                 <TextBlock Text="Size:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}" Margin="0,0,5,0" FontSize="10"/>
                                                 <TextBlock Text="W" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" Margin="0,0,3,0" FontSize="10"/>
-                                                <Slider Minimum="200" Maximum="3000"
+                                                <Slider SmallChange="1" LargeChange="10" IsSnapToTickEnabled="True" TickFrequency="1" AutomationProperties.Name="Window width" Minimum="200" Maximum="3000"
                                                         Value="{Binding Width, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                         ValueChanged="WindowWidthSlider_ValueChanged"
                                                         Width="100"/>
                                                 <TextBlock Text="H" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" Margin="10,0,3,0" FontSize="10"/>
-                                                <Slider Minimum="200" Maximum="3000"
+                                                <Slider SmallChange="1" LargeChange="10" IsSnapToTickEnabled="True" TickFrequency="1" AutomationProperties.Name="Window height" Minimum="200" Maximum="3000"
                                                         Value="{Binding Height, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                         ValueChanged="WindowHeightSlider_ValueChanged"
                                                         Width="100"/>
@@ -855,7 +828,7 @@
                                                                               ClickMode="Press"
                                                                               IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
                                                                               Style="{StaticResource ExpanderToggleButtonStyle}"
-                                                                              Width="16" Height="16"/>
+                                                                              Width="26" Height="28"/>
                                                                 <ContentPresenter x:Name="PART_Header"
                                                                                   Grid.Column="1"
                                                                                   ContentSource="Header"
@@ -901,36 +874,42 @@
                         <StackPanel Grid.Row="0" Margin="0,0,0,10">
                             <TextBlock Text="Presets" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource ForegroundColor}" Margin="0,0,0,10"/>
                             <Grid>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <ComboBox x:Name="PresetComboBox" 
+                                <ComboBox x:Name="PresetComboBox" SelectedItem="{Binding SelectedPreset, Mode=TwoWay}" AutomationProperties.Name="Saved preset"
                                           ItemsSource="{Binding PresetService.Presets}"
-                                          DisplayMemberPath="Name"
-                                          Grid.Column="0"
-                                          Margin="0,0,10,0"/>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+
+                                          Grid.Row="0" Grid.ColumnSpan="2"
+                                          Margin="0,0,0,6">
+                                    <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" Foreground="#202020"/></DataTemplate></ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal">
                                     <Button Content="Apply" Click="ApplyPreset_Click" Style="{StaticResource SettingsButtonStyle}" Width="70"/>
                                     <Button Content="Capture" Click="CapturePreset_Click" Style="{StaticResource SettingsButtonStyle}" Width="70" ToolTip="Capture the selected window or group from Windows"/>
                                     <Button Content="New" Click="NewPreset_Click" Style="{StaticResource SettingsButtonStyle}" Width="60"/>
                                     <Button Content="Delete" Click="DeletePreset_Click" Style="{StaticResource SettingsButtonStyle}" Width="70"/>
                                 </StackPanel>
                             </Grid>
+                            <TextBlock Text="{Binding PresetTargetDescription}" TextWrapping="Wrap" Foreground="{DynamicResource ForegroundColor}" Margin="0,6,0,4"/>
+                            <Button x:Name="UndoPresetButton" Content="{Binding PresetService.UndoDescription}" IsEnabled="{Binding PresetService.CanUndoDeletion}" Click="UndoPresetDelete_Click" Style="{StaticResource SettingsButtonStyle}" HorizontalAlignment="Left"/>
+
                         </StackPanel>
 
                         <!-- プリセット設定 -->
                         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                             <StackPanel DataContext="{Binding ElementName=PresetComboBox, Path=SelectedItem}">
                                 <TextBlock Text="Preset Settings" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource ForegroundColor}" Margin="0,10,0,10"/>
-                                
+
                                 <Grid Margin="0,5">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="100"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Name:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <TextBox Grid.Column="1" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
+                                    <TextBox AutomationProperties.Name="Name" Grid.Column="1" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
                                              Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
                                              BorderBrush="{DynamicResource BorderColor}"/>
                                 </Grid>
@@ -943,7 +922,7 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Process:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}" FontSize="11"/>
-                                    <TextBox Grid.Column="1" Text="{Binding TargetProcessName, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
+                                    <TextBox AutomationProperties.Name="Target Process Name" Grid.Column="1" Text="{Binding TargetProcessName, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
                                              Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
                                              BorderBrush="{DynamicResource BorderColor}" FontSize="11"
                                              ToolTip="プロセス名でフィルタ（例: notepad, chrome）。空欄の場合は全てに適用"/>
@@ -957,14 +936,14 @@
                                     <DockPanel Grid.Column="1">
                                     <Button DockPanel.Dock="Right" Content="Clear" Click="ClearPresetGroup_Click" Style="{StaticResource SettingsButtonStyle}" ToolTip="Remove the target group filter"/>
                                     <ComboBox
-                                              SelectedValue="{Binding TargetGroupId, Mode=TwoWay}"
+                                              AutomationProperties.Name="Preset target group" SelectedValue="{Binding TargetGroupId, Mode=TwoWay}"
                                               SelectedValuePath="Id"
                                               ItemsSource="{Binding DataContext.WindowGroups, RelativeSource={RelativeSource AncestorType=Window}}"
                                               Margin="5,0" FontSize="11"
                                               ToolTip="ターゲットグループを選択。未選択の場合は全てに適用">
                                         <ComboBox.ItemTemplate>
                                             <DataTemplate>
-                                                <TextBlock Text="{Binding Name}"/>
+                                                <TextBlock Text="{Binding Name}" Foreground="#202020"/>
                                             </DataTemplate>
                                         </ComboBox.ItemTemplate>
                                     </ComboBox>
@@ -976,7 +955,7 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Hotkey:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}" FontSize="11"/>
-                                    <TextBox x:Name="HotKeyTextBox" Grid.Column="1" 
+                                    <TextBox AutomationProperties.Name="Hot Key" x:Name="HotKeyTextBox" Grid.Column="1"
                                              Text="{Binding HotKey, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
                                              Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
                                              BorderBrush="{DynamicResource BorderColor}" FontSize="11"
@@ -993,11 +972,11 @@
                                         <ColumnDefinition Width="80"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Size (WxH):" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <TextBox Grid.Column="1" Text="{Binding Width, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
+                                    <TextBox AutomationProperties.Name="Width" Grid.Column="1" Text="{Binding Width, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
                                              Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
                                              BorderBrush="{DynamicResource BorderColor}"/>
                                     <TextBlock Grid.Column="2" Text="x" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <TextBox Grid.Column="3" Text="{Binding Height, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
+                                    <TextBox AutomationProperties.Name="Height" Grid.Column="3" Text="{Binding Height, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
                                              Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
                                              BorderBrush="{DynamicResource BorderColor}"/>
                                 </Grid>
@@ -1009,7 +988,7 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Opacity:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <Slider Minimum="0" Maximum="100" Value="{Binding Opacity, UpdateSourceTrigger=PropertyChanged}" Width="150" Margin="5,0"/>
+                                        <Slider SmallChange="1" LargeChange="10" IsSnapToTickEnabled="True" TickFrequency="1" AutomationProperties.Name="Preset opacity percent" Minimum="0" Maximum="100" Value="{Binding Opacity, UpdateSourceTrigger=PropertyChanged}" Width="150" Margin="5,0"/>
                                         <TextBlock Text="{Binding Opacity, StringFormat={}{0}%}" VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" Margin="5,0"/>
                                     </StackPanel>
                                 </Grid>
@@ -1018,7 +997,7 @@
 
                                 <TextBlock Text="Cascade Settings" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource ForegroundColor}" Margin="0,15,0,10"/>
                                 <CheckBox Content="Enable Cascade" IsChecked="{Binding EnableCascade}" Margin="0,5" Foreground="{DynamicResource ForegroundColor}"/>
-                                
+
                                 <Grid Margin="0,5" IsEnabled="{Binding EnableCascade}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="100"/>
@@ -1027,11 +1006,11 @@
                                         <ColumnDefinition Width="80"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Offset (X,Y):" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <TextBox Grid.Column="1" Text="{Binding CascadeOffsetX, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
+                                    <TextBox AutomationProperties.Name="Cascade Offset X" Grid.Column="1" Text="{Binding CascadeOffsetX, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
                                              Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
                                              BorderBrush="{DynamicResource BorderColor}"/>
                                     <TextBlock Grid.Column="2" Text="," VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <TextBox Grid.Column="3" Text="{Binding CascadeOffsetY, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
+                                    <TextBox AutomationProperties.Name="Cascade Offset Y" Grid.Column="3" Text="{Binding CascadeOffsetY, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
                                              Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
                                              BorderBrush="{DynamicResource BorderColor}"/>
                                 </Grid>
@@ -1042,16 +1021,16 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Direction:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                    <ComboBox Grid.Column="1" 
-                                              SelectedItem="{Binding CascadeDirection, Mode=TwoWay}" 
+                                    <ComboBox Grid.Column="1"
+                                              AutomationProperties.Name="Cascade direction" SelectedItem="{Binding CascadeDirection, Mode=TwoWay}"
                                               ItemsSource="{Binding Source={StaticResource CascadeDirectionValues}}"
                                               Margin="5,0" Width="120" HorizontalAlignment="Left"/>
                                 </Grid>
                             </StackPanel>
                         </ScrollViewer>
 
-                        <Button Grid.Row="2" Content="Save Presets" Click="SavePresets_Click" 
-                                Style="{StaticResource SettingsButtonStyle}" 
+                        <Button Grid.Row="2" Content="Save Presets" Click="SavePresets_Click"
+                                Style="{StaticResource SettingsButtonStyle}"
                                 HorizontalAlignment="Right" Margin="0,10,0,0" Width="100"/>
                     </Grid>
                 </TabItem>
@@ -1068,21 +1047,26 @@
                         <StackPanel Grid.Row="0" Margin="0,0,0,10">
                             <TextBlock Text="Saved Layouts" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource ForegroundColor}" Margin="0,0,0,10"/>
                             <Grid>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <ComboBox x:Name="LayoutComboBox" 
+                                <ComboBox x:Name="LayoutComboBox" AutomationProperties.Name="Saved layout"
                                           ItemsSource="{Binding LayoutService.Layouts}"
-                                          DisplayMemberPath="Name"
-                                          Grid.Column="0"
-                                          Margin="0,0,10,0"/>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+
+                                          Grid.Row="0" Grid.ColumnSpan="2"
+                                          Margin="0,0,0,6">
+                                    <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" Foreground="#202020"/></DataTemplate></ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal">
                                     <Button Content="Restore" Click="RestoreLayout_Click" Style="{StaticResource SettingsButtonStyle}" Width="70" ToolTip="選択したレイアウトを復元"/>
                                     <Button Content="Capture" Click="CaptureLayout_Click" Style="{StaticResource SettingsButtonStyle}" Width="70" ToolTip="現在の配置を保存"/>
                                     <Button Content="Delete" Click="DeleteLayout_Click" Style="{StaticResource SettingsButtonStyle}" Width="70"/>
                                 </StackPanel>
                             </Grid>
+                            <Button x:Name="UndoLayoutButton" Content="{Binding LayoutService.UndoDescription}" IsEnabled="{Binding LayoutService.CanUndoDeletion}" Click="UndoLayoutDelete_Click" Style="{StaticResource SettingsButtonStyle}" HorizontalAlignment="Left" Margin="0,6,0,0"/>
+
                         </StackPanel>
 
                         <!-- レイアウト詳細 -->
@@ -1090,14 +1074,14 @@
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
                                 <StackPanel DataContext="{Binding ElementName=LayoutComboBox, Path=SelectedItem}">
                                     <TextBlock Text="Layout Details" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource ForegroundColor}" Margin="0,0,0,10"/>
-                                    
+
                                     <Grid Margin="0,5">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="100"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Name:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                        <TextBox Grid.Column="1" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
+                                        <TextBox AutomationProperties.Name="Name" Grid.Column="1" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="5,0"
                                                  Background="{DynamicResource CardBackgroundColor}" Foreground="{DynamicResource ForegroundColor}"
                                                  BorderBrush="{DynamicResource BorderColor}"/>
                                     </Grid>
@@ -1108,7 +1092,7 @@
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Windows:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding Entries.Count, StringFormat={}{0} windows}" 
+                                        <TextBlock Grid.Column="1" Text="{Binding Entries.Count, StringFormat={}{0} windows}"
                                                    VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" Margin="5,0"/>
                                     </Grid>
 
@@ -1118,7 +1102,7 @@
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Modified:" VerticalAlignment="Center" Foreground="{DynamicResource ForegroundColor}"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding ModifiedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" 
+                                        <TextBlock Grid.Column="1" Text="{Binding ModifiedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}"
                                                    VerticalAlignment="Center" Foreground="{DynamicResource MutedForegroundColor}" Margin="5,0"/>
                                     </Grid>
 
@@ -1135,7 +1119,7 @@
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
                                                         <TextBlock Text="{Binding ProcessName}" FontSize="10" Foreground="{DynamicResource ForegroundColor}" VerticalAlignment="Center"/>
-                                                        <TextBlock Grid.Column="1" Text="{Binding TitlePattern}" FontSize="10" Foreground="{DynamicResource MutedForegroundColor}" 
+                                                        <TextBlock Grid.Column="1" Text="{Binding TitlePattern}" FontSize="10" Foreground="{DynamicResource MutedForegroundColor}"
                                                                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="5,0"/>
                                                         <TextBlock Grid.Column="2" FontSize="9" Foreground="{DynamicResource MutedForegroundColor}" VerticalAlignment="Center">
                                                             <Run Text="{Binding Width, StringFormat={}{0}}"/>
@@ -1170,7 +1154,7 @@
                             <CheckBox Content="Ctrl+MouseWheel adjusts window opacity" IsChecked="{Binding SettingsService.Settings.MouseWheelOpacityEnabled}" Foreground="{DynamicResource ForegroundColor}" Margin="0,15,0,5"/>
                             <Button Content="Save Preferences" Click="SavePreferences_Click" Style="{StaticResource SettingsButtonStyle}" HorizontalAlignment="Left"/>
                             <TextBlock Text="Hotkeys" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource ForegroundColor}" Margin="0,20,0,10"/>
-                            <CheckBox Content="Enable global hotkeys" 
+                            <CheckBox Content="Enable global hotkeys"
                                       IsChecked="{Binding SettingsService.Settings.HotkeysEnabled}"
                                       Margin="0,0,0,10"
                                       Foreground="{DynamicResource ForegroundColor}"/>
@@ -1190,8 +1174,8 @@
                                                 </Grid.ColumnDefinitions>
 
                                                 <CheckBox Content="{Binding Action}" IsChecked="{Binding IsEnabled}" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource ForegroundColor}"/>
-                                                
-                                                <TextBox Text="{Binding Keys}" Grid.Column="1" IsReadOnly="True" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource ForegroundColor}" Background="{DynamicResource BackgroundColor}"/>
+
+                                                <TextBox AutomationProperties.Name="Keys" Text="{Binding Keys}" Grid.Column="1" IsReadOnly="True" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource ForegroundColor}" Background="{DynamicResource BackgroundColor}"/>
 
                                                 <Button Content="Edit" Click="EditHotkey_Click" Tag="{Binding}" Grid.Column="2" Style="{StaticResource SettingsButtonStyle}" Width="60"/>
                                             </Grid>
@@ -1213,8 +1197,8 @@
                             <Run Text="Select a window or group in Windows, then use its controls or apply a preset."/><LineBreak/><LineBreak/>
                             <Run Text="Groups: enter a name and choose New Group. The selected window is added. Drag window rows onto group headers to move them. Rename and Delete Group apply to the selected manual group."/><LineBreak/><LineBreak/>
                             <Run Text="Split group: select a group with at least two windows (or one of its windows). Side by Side makes equal columns; Stacked makes equal rows on the first window's monitor work area. Other groups are left in place. Maximized/minimized windows are restored first. Size restrictions are reported as failures."/><LineBreak/><LineBreak/>
-                            <Run Text="Presets: Capture saves current settings. Target Process and Group always limit the application, including tray menus and hotkeys. A selection narrows these filters. Save Presets saves both presets and groups."/><LineBreak/><LineBreak/>
-                            <Run Text="Layouts: Capture saves the current arrangement. Restore skips ambiguous matches and reports missing or failed windows. Hover over the status text for details."/><LineBreak/><LineBreak/>
+                            <Run Text="Opacity: select a window or group, or explicitly check All windows. All 100% always resets every managed window. Search selection reveals its controls below. Presets: Capture saves current settings. Target Process and Group always limit the application, including tray menus and hotkeys. A selection narrows these filters. Save Presets saves both presets and groups."/><LineBreak/><LineBreak/>
+                            <Run Text="Delete: use the named Undo button to restore and save the latest deleted item; repeated Undo restores earlier deletions during this session. Layouts: Capture saves the current arrangement. Restore skips ambiguous matches and reports missing or failed windows. Hover over the status text for details."/><LineBreak/><LineBreak/>
                             <Run Text="Shortcuts: enable Hotkeys in Settings and save. Ctrl+MouseWheel changes opacity while enabled; turn it off in Settings to use another application's zoom."/><LineBreak/><LineBreak/>
                             <Run Text="Recovery: use the ghost toggle to disable click-through. Use 100% to make windows visible. Keep WindowSlu accessible in the taskbar or tray."/>
                         </TextBlock>
@@ -1227,11 +1211,11 @@
                             <TextBlock Text="このアプリケーションは、ウィンドウの透明度調整や最前面表示を簡単に行うためのツールです。" TextWrapping="Wrap" Margin="0,0,0,15"/>
 
                             <TextBlock Text="現在利用可能な機能" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10"/>
-                            
+
                             <TextBlock Text="■ 透明度の調整" FontWeight="Bold" Margin="0,10,0,5"/>
                             <TextBlock Text="・リスト内のスライダーを操作して、各ウィンドウの透明度を調整できます。" TextWrapping="Wrap"/>
                             <TextBlock Text="・ホットキー: Ctrl + Alt + ↑ / ↓" TextWrapping="Wrap"/>
-                            
+
                             <TextBlock Text="■ 最前面表示 (ピン留め)" FontWeight="Bold" Margin="0,10,0,5"/>
                             <TextBlock Text="・リスト右側の 📌 アイコンをクリックすると、そのウィンドウが常に最前面に表示されます。もう一度クリックすると解除されます。" TextWrapping="Wrap"/>
                             <TextBlock Text="・ホットキー: Ctrl + Alt + T" TextWrapping="Wrap"/>
@@ -1243,7 +1227,7 @@
                     </ScrollViewer>
                 </TabItem>
             </TabControl>
-            
+
             <!-- Bottom Bar -->
             <DockPanel Grid.Row="2" LastChildFill="True">
                 <StatusBar Background="Transparent" BorderThickness="0">

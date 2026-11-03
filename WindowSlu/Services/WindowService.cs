@@ -156,7 +156,7 @@ namespace WindowSlu.Services
             "SearchApp"
         };
 
-        public ObservableCollection<WindowInfo> GetAllWindows()
+        public virtual ObservableCollection<WindowInfo> GetAllWindows()
         {
             var windows = new ObservableCollection<WindowInfo>();
             var selfProcessId = Process.GetCurrentProcess().Id;

@@ -4,7 +4,7 @@ using WindowSlu.Models;
 
 namespace WindowSlu.Services;
 
-public class PresetService
+public class PresetService : System.ComponentModel.INotifyPropertyChanged
 {
     private readonly string _presetFilePath;
     private readonly WindowService _windowService;
@@ -50,12 +50,32 @@ public class PresetService
         return preset;
     }
 
-    public bool DeletePreset(string presetId)
+    private readonly Stack<(WindowPreset Item, int Index)> _deleted = new();
+    public bool CanUndoDeletion => _deleted.Count > 0;
+    public string UndoDescription => CanUndoDeletion ? $"Undo delete '{_deleted.Peek().Item.Name}'" : "Nothing to undo";
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    private void NotifyUndo()
     {
-        var preset = GetPresetById(presetId);
-        if (preset == null) return false;
-        Presets.Remove(preset);
-        return SavePresets();
+        PropertyChanged?.Invoke(this, new(nameof(CanUndoDeletion)));
+        PropertyChanged?.Invoke(this, new(nameof(UndoDescription)));
+    }
+    public bool DeletePreset(string id)
+    {
+        var item = GetPresetById(id);
+        if (item == null) return false;
+        int index = Presets.IndexOf(item);
+        Presets.RemoveAt(index);
+        if (!SavePresets()) { Presets.Insert(index, item); return false; }
+        _deleted.Push((item, index)); NotifyUndo(); return true;
+    }
+    public bool UndoDelete(out WindowPreset? restored)
+    {
+        restored = null;
+        if (!CanUndoDeletion) return false;
+        var entry = _deleted.Peek();
+        Presets.Insert(Math.Min(entry.Index, Presets.Count), entry.Item);
+        if (!SavePresets()) { Presets.Remove(entry.Item); return false; }
+        restored = entry.Item; _deleted.Pop(); NotifyUndo(); return true;
     }
 
     public void UpdatePreset(WindowPreset preset) { preset.ModifiedAt = DateTime.Now; SavePresets(); }

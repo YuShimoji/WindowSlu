@@ -5,6 +5,7 @@ using WindowSlu.Services;
 
 namespace WindowSlu.Tests;
 
+[Collection("Native desktop")]
 public class NativeSplitArrangementTests
 {
     [Fact]

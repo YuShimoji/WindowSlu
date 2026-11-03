@@ -133,9 +133,59 @@ namespace WindowSlu.ViewModels
 
         public void NotifySplitTargetChanged()
         {
+            NotifyOperationTargetsChanged();
             OnPropertyChanged(nameof(CanSplitSelectedGroup));
             OnPropertyChanged(nameof(SplitTargetDescription));
         }
+
+        private bool _applyToAllWindows;
+        public bool ApplyToAllWindows
+        {
+            get => _applyToAllWindows;
+            set { _applyToAllWindows = value; OnPropertyChanged(); NotifyOperationTargetsChanged(); }
+        }
+        public IReadOnlyList<WindowInfo> GetOpacityTargets() => ApplyToAllWindows ? Windows.ToList()
+            : SelectedWindow != null ? new[] { SelectedWindow }
+            : SelectedGroup != null ? SelectedGroup.Windows.ToList() : Array.Empty<WindowInfo>();
+        public string SelectionDescription => SelectedWindow != null ? $"Window '{SelectedWindow.Title}' (1)"
+            : SelectedGroup != null ? $"Group '{SelectedGroup.Name}' ({SelectedGroup.Windows.Count})" : "No selection";
+        public string OpacityTargetDescription => ApplyToAllWindows ? $"All managed windows ({Windows.Count})" : SelectionDescription;
+        public string ResetAllDescription => $"Reset all managed windows ({Windows.Count}) to 100%";
+        public bool CanApplyOpacity => GetOpacityTargets().Count > 0;
+        private WindowPreset? _selectedPreset;
+        public WindowPreset? SelectedPreset
+        {
+            get => _selectedPreset;
+            set
+            {
+                if (_selectedPreset != null) _selectedPreset.PropertyChanged -= PresetChanged;
+                _selectedPreset = value;
+                if (value != null) value.PropertyChanged += PresetChanged;
+                OnPropertyChanged(); NotifyOperationTargetsChanged();
+                StatusText = value == null ? "Select a preset to apply." : "Preset selected. Check targets before Apply.";
+                OperationDetails = string.Empty;
+            }
+        }
+        private void PresetChanged(object? sender, PropertyChangedEventArgs e) => NotifyOperationTargetsChanged();
+        public string PresetTargetDescription
+        {
+            get
+            {
+                if (SelectedPreset == null) return "Select a preset to see targets and conditions.";
+                var candidates = SelectedWindow != null ? new[] { SelectedWindow }
+                    : SelectedGroup != null ? SelectedGroup.Windows.AsEnumerable() : WindowGroups.SelectMany(g => g.Windows);
+                int count = candidates.Where(w => PresetService.MatchesTargetFilter(SelectedPreset, w)).Select(w => w.Handle).Distinct().Count();
+                string group = string.IsNullOrWhiteSpace(SelectedPreset.TargetGroupId) ? "any group"
+                    : WindowGroups.FirstOrDefault(g => g.Id == SelectedPreset.TargetGroupId)?.Name ?? SelectedPreset.TargetGroupId;
+                return $"{(SelectedWindow == null && SelectedGroup == null ? "All managed windows" : SelectionDescription)}; process: {(string.IsNullOrWhiteSpace(SelectedPreset.TargetProcessName) ? "any" : SelectedPreset.TargetProcessName)}; group: {group}; matches: {count}";
+            }
+        }
+        public void NotifyOperationTargetsChanged()
+        {
+            OnPropertyChanged(nameof(OpacityTargetDescription)); OnPropertyChanged(nameof(CanApplyOpacity));
+            OnPropertyChanged(nameof(PresetTargetDescription)); OnPropertyChanged(nameof(ResetAllDescription));
+        }
+        public bool IsReadingWindowState { get; private set; }
 
         public int BulkOpacityPercent
         {
@@ -185,64 +235,70 @@ namespace WindowSlu.ViewModels
             _refreshing = true;
             try
             {
-            var newWindows = await Task.Run(() => WindowService.GetAllWindows());
-            var foregroundWindow = await Task.Run(() => WindowService.GetForegroundWindow());
-            
-            await Application.Current.Dispatcher.InvokeAsync(() =>
-            {
-                var currentHandles = new HashSet<IntPtr>(Windows.Select(w => w.Handle));
-                var newHandles = new HashSet<IntPtr>(newWindows.Select(w => w.Handle));
+                var newWindows = await Task.Run(() => WindowService.GetAllWindows());
+                var foregroundWindow = await Task.Run(() => WindowService.GetForegroundWindow());
 
-                foreach (var window in newWindows)
+                await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
-                    var existing = Windows.FirstOrDefault(w => w.Handle == window.Handle);
-                    if (existing == null)
+                    IsReadingWindowState = true;
+                    try
                     {
-                        window.Opacity = WindowService.GetTransparency(window.Handle);
-                        window.IsTopMost = WindowService.IsTopMost(window.Handle);
-                        window.IsClickThrough = WindowService.IsClickThrough(window.Handle);
-                        WindowService.UpdateWindowPositionInfo(window);
-                        Windows.Add(window);
-                    }
-                    else
-                    {
-                        existing.Title = window.Title;
-                        existing.Opacity = WindowService.GetTransparency(window.Handle);
-                        bool isActuallyTopMost = WindowService.IsTopMost(window.Handle);
-                        if (existing.IsTopMost != isActuallyTopMost)
+                        var newHandles = new HashSet<IntPtr>(newWindows.Select(w => w.Handle));
+
+                        foreach (var window in newWindows)
                         {
-                            existing.IsTopMost = isActuallyTopMost;
+                            var existing = Windows.FirstOrDefault(w => w.Handle == window.Handle);
+                            if (existing == null)
+                            {
+                                window.Opacity = WindowService.GetTransparency(window.Handle);
+                                window.IsTopMost = WindowService.IsTopMost(window.Handle);
+                                window.IsClickThrough = WindowService.IsClickThrough(window.Handle);
+                                WindowService.UpdateWindowPositionInfo(window);
+                                Windows.Add(window);
+                            }
+                            else
+                            {
+                                existing.Title = window.Title;
+                                existing.Opacity = WindowService.GetTransparency(window.Handle);
+                                bool isActuallyTopMost = WindowService.IsTopMost(window.Handle);
+                                if (existing.IsTopMost != isActuallyTopMost)
+                                {
+                                    existing.IsTopMost = isActuallyTopMost;
+                                }
+
+                                bool isActuallyClickThrough = WindowService.IsClickThrough(window.Handle);
+                                if (existing.IsClickThrough != isActuallyClickThrough)
+                                {
+                                    existing.IsClickThrough = isActuallyClickThrough;
+                                }
+
+                                // 位置情報を更新
+                                WindowService.UpdateWindowPositionInfo(existing);
+                            }
                         }
 
-                        bool isActuallyClickThrough = WindowService.IsClickThrough(window.Handle);
-                        if (existing.IsClickThrough != isActuallyClickThrough)
+                        var windowsToRemove = Windows.Where(w => !newHandles.Contains(w.Handle)).ToList();
+                        foreach (var window in windowsToRemove)
                         {
-                            existing.IsClickThrough = isActuallyClickThrough;
+                            Windows.Remove(window);
                         }
-                        
-                        // 位置情報を更新
-                        WindowService.UpdateWindowPositionInfo(existing);
+
+                        if (SelectedWindow != null && !newHandles.Contains(SelectedWindow.Handle)) SelectedWindow = null;
+
+                        // アクティブウィンドウを設定
+                        foreach (var window in Windows)
+                        {
+                            window.IsActive = window.Handle == foregroundWindow;
+                        }
+
+                        // グループ化を更新
+                        GroupingService.UpdateGroups(Windows);
+                        OnPropertyChanged(nameof(WindowGroups));
+                        OnPropertyChanged(nameof(FilteredWindows));
+                        NotifySplitTargetChanged();
                     }
-                }
-
-                var windowsToRemove = Windows.Where(w => !newHandles.Contains(w.Handle)).ToList();
-                foreach (var window in windowsToRemove)
-                {
-                    Windows.Remove(window);
-                }
-
-                // アクティブウィンドウを設定
-                foreach (var window in Windows)
-                {
-                    window.IsActive = window.Handle == foregroundWindow;
-                }
-
-                // グループ化を更新
-                GroupingService.UpdateGroups(Windows);
-                OnPropertyChanged(nameof(WindowGroups));
-                OnPropertyChanged(nameof(FilteredWindows));
-                NotifySplitTargetChanged();
-            });
+                    finally { IsReadingWindowState = false; }
+                });
             }
             finally { _refreshing = false; }
         }
@@ -258,11 +314,11 @@ namespace WindowSlu.ViewModels
 
         public void UpdateWindowOpacity(int newOpacity)
         {
-            // This is a placeholder. 
+            // This is a placeholder.
             // The original implementation likely called _mainWindow.ShowTransparencyIndicator(newOpacity);
             _mainWindow.ShowTransparencyIndicator(newOpacity);
         }
-        
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -270,4 +326,4 @@ namespace WindowSlu.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
-} 
+}

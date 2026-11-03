@@ -48,7 +48,7 @@ namespace WindowSlu
             LoggingService.LogInfo("MainWindow constructor called.");
             InitializeComponent();
             InitializeIndicatorTimer();
-            
+
             var windowService = windowServiceOverride ?? new WindowService();
             _themeService = new ThemeService();
             _settingsService = new SettingsService(dataDirectory == null ? null : System.IO.Path.Combine(dataDirectory, "settings.json"));
@@ -248,7 +248,9 @@ namespace WindowSlu
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             LoggingService.LogInfo("MainWindow_Loaded event triggered.");
-            
+            // An isolated host supplies its own windows. Never enumerate user apps or create tray hooks.
+            if (!_enableSystemHooks) { _hwnd = new WindowInteropHelper(this).EnsureHandle(); return; }
+
             // Restore window position and size with validation
             RestoreWindowPosition();
 
@@ -256,31 +258,31 @@ namespace WindowSlu
             if (_enableSystemHooks && _settingsService.Settings.HotkeysEnabled)
             {
                 _hotkeyService = new HotkeyService(_hwnd, _settingsService, HandleHotkey);
-                
+
                 // 既存プリセットのホットキーを登録
                 RegisterAllPresetHotkeys();
             }
-            
+
             // Add a hook to receive window messages
             if (PresentationSource.FromVisual(this) is HwndSource source)
             {
                 source.AddHook(WndProc);
             }
-            
+
             try
             {
                 MyNotifyIcon = (Hardcodet.Wpf.TaskbarNotification.TaskbarIcon)FindResource("NotifyIcon");
                 if (MyNotifyIcon != null)
                 {
                     _contextMenu = new ContextMenu();
-                    
+
                     // Show
                     _showMenuItem = new MenuItem { Header = "Show WindowSlu" };
                     _showMenuItem.Click += ShowMenuItem_Click;
                     _contextMenu.Items.Add(_showMenuItem);
-                    
+
                     _contextMenu.Items.Add(new Separator());
-                    
+
                     // Quick Opacity
                     var opacityMenu = new MenuItem { Header = "Set All Opacity" };
                     var opacity100 = new MenuItem { Header = "100% (Opaque)" };
@@ -293,24 +295,24 @@ namespace WindowSlu
                     opacityMenu.Items.Add(opacity80);
                     opacityMenu.Items.Add(opacity50);
                     _contextMenu.Items.Add(opacityMenu);
-                    
+
                     // Presets submenu (dynamically populated)
                     var presetsMenu = new MenuItem { Header = "Apply Preset" };
                     presetsMenu.SubmenuOpened += (s, e) => RefreshPresetsSubmenu(presetsMenu);
                     _contextMenu.Items.Add(presetsMenu);
-                    
+
                     // Layouts submenu (dynamically populated)
                     var layoutsMenu = new MenuItem { Header = "Restore Layout" };
                     layoutsMenu.SubmenuOpened += (s, e) => RefreshLayoutsSubmenu(layoutsMenu);
                     _contextMenu.Items.Add(layoutsMenu);
-                    
+
                     _contextMenu.Items.Add(new Separator());
-                    
+
                     // Exit
                     _exitMenuItem = new MenuItem { Header = "Exit" };
                     _exitMenuItem.Click += ExitMenuItem_Click;
                     _contextMenu.Items.Add(_exitMenuItem);
-                    
+
                     MyNotifyIcon.ContextMenu = _contextMenu;
                 }
             }
@@ -322,7 +324,7 @@ namespace WindowSlu
             {
                 System.Diagnostics.Debug.WriteLine($"[DEBUG] An unexpected error occurred with NotifyIcon: {ex.Message}");
             }
-            
+
             await _viewModel.RefreshWindowList();
             _viewModel.InitializeGroups();
             _viewModel.Start();
@@ -344,7 +346,7 @@ namespace WindowSlu
 
             // Save current theme
             _settingsService.Settings.Theme = _currentTheme.ToString();
-            
+
             if (_viewModel.PresetService.LastError == null && !_viewModel.PresetService.SavePresets())
                 MessageBox.Show(_viewModel.PresetService.LastError, "Groups save failed", MessageBoxButton.OK, MessageBoxImage.Warning);
             if (!_settingsService.SaveSettings()) MessageBox.Show(_settingsService.LastError, "Settings save failed", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -352,14 +354,20 @@ namespace WindowSlu
             _viewModel.Stop();
             MyNotifyIcon?.Dispose();
         }
-        
+
         private bool SetTransparency(IntPtr hWnd, int percent)
         {
-            bool success = _viewModel.WindowService.SetTransparency(hWnd, percent);
-            var window = _viewModel.Windows.FirstOrDefault(w => w.Handle == hWnd);
-            if (window != null) window.Opacity = _viewModel.WindowService.GetTransparency(hWnd);
-            if (!success) _viewModel.StatusText = "Could not change opacity; the actual value has been reloaded.";
-            return success;
+            bool wasReading = _readingWindowState;
+            _readingWindowState = true;
+            try
+            {
+                bool success = _viewModel.WindowService.SetTransparency(hWnd, percent);
+                var window = _viewModel.Windows.FirstOrDefault(w => w.Handle == hWnd);
+                if (window != null) window.Opacity = _viewModel.WindowService.GetTransparency(hWnd);
+                if (!success) _viewModel.StatusText = "Could not change opacity; the actual value has been reloaded.";
+                return success;
+            }
+            finally { _readingWindowState = wasReading; }
         }
 
         private void ToggleTopMost(IntPtr hWnd)
@@ -388,10 +396,10 @@ namespace WindowSlu
             var workArea = SystemParameters.WorkArea;
 
             // 位置の検証（画面内に収まるか確認）
-            bool isPositionValid = 
-                left >= workArea.Left - 100 && 
+            bool isPositionValid =
+                left >= workArea.Left - 100 &&
                 left < workArea.Right - 100 &&
-                top >= workArea.Top - 50 && 
+                top >= workArea.Top - 50 &&
                 top < workArea.Bottom - 100;
 
             if (!isPositionValid)
@@ -410,27 +418,6 @@ namespace WindowSlu
             LoggingService.LogInfo($"Window position restored: Left={left}, Top={top}, Width={width}, Height={height}");
         }
 
-        private IEnumerable<WindowInfo> GetBulkTargetWindows()
-        {
-            if (_viewModel.SelectedGroup != null)
-            {
-                return _viewModel.SelectedGroup.Windows;
-            }
-
-            if (_selectedWindowInfo != null)
-            {
-                var group = _viewModel.WindowGroups.FirstOrDefault(g => g.Windows.Contains(_selectedWindowInfo));
-                if (group != null)
-                {
-                    return group.Windows;
-                }
-
-                return new[] { _selectedWindowInfo };
-            }
-
-            return _viewModel.Windows;
-        }
-
         // --- Event Handlers ---
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { if (e.LeftButton == MouseButtonState.Pressed) DragMove(); }
         private void MinimizeButton_Click(object sender, RoutedEventArgs e) { WindowState = WindowState.Minimized; }
@@ -444,9 +431,10 @@ namespace WindowSlu
             {
                 ClearTreeSelection(WindowTreeView);
                 _viewModel.SelectedGroup = null;
+                RevealWindowControls(_selectedWindowInfo);
             }
         }
-        
+
         private void WindowTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
             if (e.NewValue != null) AllWindowsListView.SelectedItem = null;
@@ -463,6 +451,24 @@ namespace WindowSlu
                 _viewModel.SelectedGroup = group;
                 GroupNameTextBox.Text = group.Name;
             }
+        }
+
+        // Reveal without selecting/focusing: retain search text, list selection and keyboard focus.
+        private void RevealWindowControls(WindowInfo info)
+        {
+            var group = _viewModel.WindowGroups.FirstOrDefault(g => g.Windows.Any(w => w.Handle == info.Handle));
+            if (group == null) return;
+            group.IsExpanded = true;
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+            {
+                if (_viewModel.SelectedWindow?.Handle != info.Handle) return;
+                WindowTreeView.UpdateLayout();
+                if (WindowTreeView.ItemContainerGenerator.ContainerFromItem(group) is TreeViewItem parent)
+                {
+                    parent.IsExpanded = true; parent.UpdateLayout();
+                    if (parent.ItemContainerGenerator.ContainerFromItem(info) is TreeViewItem row) row.BringIntoView();
+                }
+            }));
         }
 
         private static void ClearTreeSelection(ItemsControl parent)
@@ -513,34 +519,35 @@ namespace WindowSlu
                 info.IsClickThrough = _viewModel.WindowService.IsClickThrough(info.Handle);
             }
         }
-        private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) 
-        { 
-            if (sender is Slider slider && (slider.IsMouseCaptureWithin || slider.IsKeyboardFocusWithin) && slider.DataContext is WindowInfo info)
+        private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_viewModel != null && !_readingWindowState && !_viewModel.IsReadingWindowState && sender is Slider slider && (slider.IsMouseCaptureWithin || slider.IsKeyboardFocusWithin) && slider.DataContext is WindowInfo info)
             {
                 System.Diagnostics.Debug.WriteLine($"[DEBUG] Slider changed for '{info.Title}' to {e.NewValue}");
-                SetTransparency(info.Handle, (int)e.NewValue); 
+                SetTransparency(info.Handle, (int)e.NewValue);
             }
         }
-        private void WindowWidthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        private bool _readingWindowState;
+        private void WindowWidthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => ResizeFromSlider(sender, e, true);
+        private void WindowHeightSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => ResizeFromSlider(sender, e, false);
+        private void ResizeFromSlider(object sender, RoutedPropertyChangedEventArgs<double> e, bool width)
         {
-            if (sender is Slider slider && slider.IsMouseCaptureWithin && slider.DataContext is WindowInfo info)
+            if (_readingWindowState || _viewModel == null || _viewModel.IsReadingWindowState ||
+                sender is not Slider slider || !(slider.IsMouseCaptureWithin || slider.IsKeyboardFocusWithin) ||
+                slider.DataContext is not WindowInfo info) return;
+            _readingWindowState = true;
+            try
             {
-                int newWidth = (int)e.NewValue;
-                int height = info.Height > 0 ? info.Height : 600;
-                if (_viewModel.WindowService.SetWindowSize(info.Handle, newWidth, height)) _viewModel.WindowService.UpdateWindowPositionInfo(info);
-                else _viewModel.StatusText = "Could not resize window.";
+                var before = _viewModel.WindowService.GetWindowPosition(info.Handle);
+                bool success = _viewModel.WindowService.SetWindowSize(info.Handle, width ? (int)e.NewValue : before.Width,
+                    width ? before.Height : (int)e.NewValue);
+                _viewModel.WindowService.UpdateWindowPositionInfo(info);
+                slider.SetCurrentValue(Slider.ValueProperty, (double)(width ? info.Width : info.Height));
+                _viewModel.StatusText = success ? $"'{info.Title}' size: {info.Width} x {info.Height}"
+                    : $"Could not resize '{info.Title}'; actual size: {info.Width} x {info.Height}";
+                _viewModel.OperationDetails = string.Empty;
             }
-        }
-
-        private void WindowHeightSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (sender is Slider slider && slider.IsMouseCaptureWithin && slider.DataContext is WindowInfo info)
-            {
-                int newHeight = (int)e.NewValue;
-                int width = info.Width > 0 ? info.Width : 800;
-                if (_viewModel.WindowService.SetWindowSize(info.Handle, width, newHeight)) _viewModel.WindowService.UpdateWindowPositionInfo(info);
-                else _viewModel.StatusText = "Could not resize window.";
-            }
+            finally { _readingWindowState = false; }
         }
 
         // --- Group Bulk Control Event Handlers ---
@@ -600,9 +607,9 @@ namespace WindowSlu
             }
         }
 
-        private void ThemeToggleButton_Click(object sender, RoutedEventArgs e) 
+        private void ThemeToggleButton_Click(object sender, RoutedEventArgs e)
         {
-            _currentTheme = _currentTheme == Services.Theme.Dark ? Services.Theme.Light : Services.Theme.Dark; 
+            _currentTheme = _currentTheme == Services.Theme.Dark ? Services.Theme.Light : Services.Theme.Dark;
             _themeService.ApplyTheme(_currentTheme);
         }
 
@@ -615,7 +622,7 @@ namespace WindowSlu
                 var source = e.OriginalSource as DependencyObject;
                 while (source != null && source != grid)
                 {
-                    if (source is Slider || source is System.Windows.Controls.Primitives.ToggleButton || 
+                    if (source is Slider || source is System.Windows.Controls.Primitives.ToggleButton ||
                         source is System.Windows.Controls.Primitives.Thumb || source is Button ||
                         source is TextBox)
                     {
@@ -623,7 +630,7 @@ namespace WindowSlu
                     }
                     source = VisualTreeHelper.GetParent(source);
                 }
-                
+
                 DragDrop.DoDragDrop(grid, windowInfo, DragDropEffects.Move);
             }
         }
@@ -652,7 +659,7 @@ namespace WindowSlu
             }
             e.Handled = true;
         }
-        
+
         // --- Tray Icon ---
         private void TrayButton_Click(object sender, RoutedEventArgs e) { if(MyNotifyIcon != null) { Hide(); MyNotifyIcon.Visibility = Visibility.Visible; } }
         private void ShowWindow() { if(MyNotifyIcon != null) { Show(); WindowState = WindowState.Normal; Activate(); MyNotifyIcon.Visibility = Visibility.Collapsed; } }
@@ -731,6 +738,8 @@ namespace WindowSlu
         // --- Preset Event Handlers ---
         private void ApplyPreset_Click(object sender, RoutedEventArgs e)
         {
+            if (PresetComboBox.SelectedItem is not WindowPreset)
+            { _viewModel.StatusText = "Select a preset to apply."; _viewModel.OperationDetails = string.Empty; return; }
             if (PresetComboBox.SelectedItem is WindowPreset preset)
                 ShowOperationResult($"Preset '{preset.Name}'", _viewModel.PresetService.ApplyPreset(
                     preset, _viewModel.WindowGroups, _viewModel.SelectedGroup, _selectedWindowInfo));
@@ -747,11 +756,14 @@ namespace WindowSlu
         {
             if (PresetComboBox.SelectedItem is WindowPreset preset)
             {
-                string name = preset.Name;
-                // ホットキーを解除
-                _hotkeyService?.UnregisterPresetHotkey(preset.Id);
-                _viewModel.PresetService.DeletePreset(preset.Id);
-                _viewModel.StatusText = _viewModel.PresetService.LastError ?? $"Deleted preset: {name}";
+                if (_viewModel.PresetService.DeletePreset(preset.Id))
+                {
+                    _hotkeyService?.UnregisterPresetHotkey(preset.Id);
+                    PresetComboBox.SelectedItem = null;
+                    _viewModel.StatusText = $"Deleted preset '{preset.Name}'. Undo is available below.";
+                }
+                else { PresetComboBox.SelectedItem = preset; _viewModel.StatusText = _viewModel.PresetService.LastError ?? "Delete failed."; }
+                _viewModel.OperationDetails = string.Empty;
             }
         }
 
@@ -763,9 +775,9 @@ namespace WindowSlu
             if (sender is not System.Windows.Controls.TextBox textBox) return;
             if (PresetComboBox.SelectedItem is not WindowPreset preset) return;
 
-            e.Handled = true;
-
             var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (key == Key.Tab) return; // Tab / Shift+Tab leave the editor without changing the assignment.
+            e.Handled = true;
 
             // 修飾キーのみの場合は無視
             if (key == Key.LeftCtrl || key == Key.RightCtrl ||
@@ -796,6 +808,22 @@ namespace WindowSlu
             var hotKeyString = string.Join("+", parts);
             TrySetPresetHotkey(preset, hotKeyString);
             textBox.Text = preset.HotKey ?? string.Empty;
+        }
+
+        private void UndoPresetDelete_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_viewModel.PresetService.UndoDelete(out var preset))
+            { _viewModel.StatusText = _viewModel.PresetService.LastError ?? "Nothing to undo."; return; }
+            PresetComboBox.SelectedItem = preset;
+            bool registered = _hotkeyService == null || string.IsNullOrWhiteSpace(preset!.HotKey) || _hotkeyService.RegisterPresetHotkey(preset.Id, preset.HotKey);
+            _viewModel.StatusText = $"Restored preset '{preset!.Name}' and saved." + (registered ? "" : " Hotkey conflict: " + string.Join("; ", _hotkeyService!.LastRegistrationErrors));
+        }
+        private void UndoLayoutDelete_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_viewModel.LayoutService.UndoDelete(out var layout))
+            { _viewModel.StatusText = _viewModel.LayoutService.LastError ?? "Nothing to undo."; return; }
+            LayoutComboBox.SelectedItem = layout;
+            _viewModel.StatusText = $"Restored layout '{layout!.Name}' and saved.";
         }
 
         private bool TrySetPresetHotkey(WindowPreset preset, string hotkey)
@@ -849,9 +877,13 @@ namespace WindowSlu
         {
             if (LayoutComboBox.SelectedItem is WindowLayout layout)
             {
-                string name = layout.Name;
-                _viewModel.LayoutService.DeleteLayout(layout.Id);
-                _viewModel.StatusText = _viewModel.LayoutService.LastError ?? $"Deleted layout: {name}";
+                if (_viewModel.LayoutService.DeleteLayout(layout.Id))
+                {
+                    LayoutComboBox.SelectedItem = null;
+                    _viewModel.StatusText = $"Deleted layout '{layout.Name}'. Undo is available below.";
+                }
+                else { LayoutComboBox.SelectedItem = layout; _viewModel.StatusText = _viewModel.LayoutService.LastError ?? "Delete failed."; }
+                _viewModel.OperationDetails = string.Empty;
             }
         }
 
@@ -1056,17 +1088,17 @@ namespace WindowSlu
         // --- Bulk Window Operations ---
         private void SetAllTo80Percent_Click(object sender, RoutedEventArgs e)
         {
-            ApplyBulkOpacity(80);
+            ApplyBulkOpacity(_viewModel.BulkOpacityPercent);
         }
 
-        private void SetAllTo100Percent_Click(object sender, RoutedEventArgs e) => ApplyBulkOpacity(100);
+        private void SetAllTo100Percent_Click(object sender, RoutedEventArgs e) => SetAllWindowsOpacity(100);
 
         private void ApplyBulkOpacity(int opacity)
         {
             var result = new WindowOperationResult();
-            foreach (var window in GetBulkTargetWindows().ToList())
+            foreach (var window in _viewModel.GetOpacityTargets())
                 if (SetTransparency(window.Handle, opacity)) result.Succeeded++; else result.Failed++;
-            ShowOperationResult($"Selected targets opacity {opacity}%", result);
+            ShowOperationResult($"{_viewModel.OpacityTargetDescription}: opacity {opacity}%", result);
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -1084,4 +1116,4 @@ namespace WindowSlu
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged(string propertyName) { PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName)); }
     }
-} 
+}

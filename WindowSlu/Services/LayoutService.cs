@@ -4,7 +4,7 @@ using WindowSlu.Models;
 
 namespace WindowSlu.Services;
 
-public class LayoutService
+public class LayoutService : System.ComponentModel.INotifyPropertyChanged
 {
     private readonly WindowService _windowService;
     private readonly string _layoutFilePath;
@@ -59,11 +59,32 @@ public class LayoutService
         Layouts.Add(layout); SaveLayouts(); return layout;
     }
 
-    public bool DeleteLayout(string layoutId)
+    private readonly Stack<(WindowLayout Item, int Index)> _deleted = new();
+    public bool CanUndoDeletion => _deleted.Count > 0;
+    public string UndoDescription => CanUndoDeletion ? $"Undo delete '{_deleted.Peek().Item.Name}'" : "Nothing to undo";
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    private void NotifyUndo()
     {
-        var layout = Layouts.FirstOrDefault(l => l.Id == layoutId);
-        if (layout == null) return false;
-        Layouts.Remove(layout); return SaveLayouts();
+        PropertyChanged?.Invoke(this, new(nameof(CanUndoDeletion)));
+        PropertyChanged?.Invoke(this, new(nameof(UndoDescription)));
+    }
+    public bool DeleteLayout(string id)
+    {
+        var item = Layouts.FirstOrDefault(l => l.Id == id);
+        if (item == null) return false;
+        int index = Layouts.IndexOf(item);
+        Layouts.RemoveAt(index);
+        if (!SaveLayouts()) { Layouts.Insert(index, item); return false; }
+        _deleted.Push((item, index)); NotifyUndo(); return true;
+    }
+    public bool UndoDelete(out WindowLayout? restored)
+    {
+        restored = null;
+        if (!CanUndoDeletion) return false;
+        var entry = _deleted.Peek();
+        Layouts.Insert(Math.Min(entry.Index, Layouts.Count), entry.Item);
+        if (!SaveLayouts()) { Layouts.Remove(entry.Item); return false; }
+        restored = entry.Item; _deleted.Pop(); NotifyUndo(); return true;
     }
 
     public void UpdateLayout(WindowLayout layout, IEnumerable<WindowInfo> windows)

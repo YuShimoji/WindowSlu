@@ -13,6 +13,7 @@ using WindowSlu.ViewModels;
 
 namespace WindowSlu.Tests;
 
+[Collection("Native desktop")]
 public class UiAndNativeTests
 {
     [Fact]
@@ -50,6 +51,7 @@ public class UiAndNativeTests
         {
             string directory = Path.Combine(Path.GetTempPath(), "WindowSlu.UiTests", Guid.NewGuid().ToString("N"));
             var app = new App();
+            app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             app.InitializeComponent();
             app.ChangeTheme(WindowSlu.Theme.Dark);
             MainWindow? window = null;
@@ -169,6 +171,7 @@ public class UiAndNativeTests
                         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap)); encoder.Save(file);
                     }
                 }
+                UiImprovementScenarios.Run(app);
                 viewModel.Windows.Clear();
                 Invoke(window, "DeleteGroup_Click");
                 Assert.Empty(viewModel.WindowGroups);
@@ -231,7 +234,7 @@ public class UiAndNativeTests
         Exception? error = null;
         var thread = new Thread(() => { try { action(); } catch (Exception ex) { error = ex; } });
         thread.SetApartmentState(ApartmentState.STA); thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(30)), "STA test did not finish.");
+        Assert.True(thread.Join(TimeSpan.FromSeconds(Environment.GetEnvironmentVariable("WINDOWSLU_HOLD_UI") == "1" ? 1500 : 90)), "STA test did not finish.");
         if (error != null) ExceptionDispatchInfo.Capture(error).Throw();
     }
 }

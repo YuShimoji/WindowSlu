@@ -1,6 +1,6 @@
 # WindowSlu 開発申し送り
 
-## 2026-11-04 UI評価に基づく改善（工程登録・実装チャット起動）
+## 2026-11-04 UI評価に基づく改善（実装・検証・共有完了）
 
 本人原文:「上記について改善のための開発工程を設計し、Recordinatorに登録して、新規スレッドに適切なモデルとエフォートでPromptを与えて作業を完了させてください。」
 
@@ -15,11 +15,33 @@
 
 同じMainWindow・選択状態を変更するため実装は独立チャット1件に集約する。親が直接行うと、実装・検証を含め数十回規模のツール操作になる見込みであり、短い内部補助へ分解しない。親は工程、Recordinator、HANDOVER、レビュー・統合を所有し、Workerは `WindowSlu/`、`WindowSlu.Tests/`、READMEと専用証跡を所有する。互いに他者の変更をrevertしない。GUI担当は実装Workerのみ。
 
-新規チャットの推奨構成は実装用標準モデルgpt-6.1-sol / high。本人が選択肢「gpt-6.1-sol / highで起動する（推奨）」を選択済み。指定値・作成結果・実行内部値は分けて記録する。独立チャット `01a1a29c-a44e-7b01-a4fe-0cc980983f83`（host local）を作成済み。作成ツールへgpt-6.1-sol / highを指定し受付成功。実行内部設定は未取得。実際の着手はチャットの進捗を確認して判定する。時間の比較可能な実績がないため数値の所要時間見込みは置かず、正確さの実装終了時と統合検証終了時に報告する。
+新規チャットの推奨構成は実装用標準モデルgpt-6.1-sol / highで、本人が同設定を選択済み。独立チャット `01a1a29c-a44e-7b01-a4fe-0cc980983f83`（host local）への指定と受付、プロジェクト配下での表示・着手・最終返却を確認した。実行内部設定は未取得であり、指定値と区別する。
+
+比較可能な時間実績がないため数値の所要時間見込みは置かなかった。正確さの接続、native・実画面の検証、最終反映の区切りで報告した。
 
 Recordinator: 通常アイコンのCLI `D:/Recordinator/outputs/desktop-normal/.venv/Scripts/recordinator.exe`、Home `C:/Users/thank/AppData/Local/Packages/Claude_pzs8sxrjxfjjc/LocalCache/Local/Recordinator`、Project `p7dae6c4876`。依頼 `3528158e-14e0-4884-83e3-9f879a37045c`、本文版 `01M6H9KE3NGDA11Y45Z2FBY9TG`。保存はlegacy_localで、別端末同期・本人の成果受入とは区別する。Task作成は担当の着手や完了を意味しない。
 
 完了は実装・専用環境の実動作・保存再読込・描画と差分レビュー・通常push・Recordinator結果読戻しで判定する。人間の疲労・完了時間・使いやすさの受入、全DPI・全外部アプリでの動作は代替しない。公開タグ・配布リリース・他者への送信は今回行わない。
+
+### 到達点と親の受入確認
+
+6指摘と直接関連するアクセシビリティ修正を受領し、親が差分・51件TRX・描画・publishのSHA256・製品Git tree・CI成功を照合した。Workerの最終返却は完了、担当3Taskはdoneとして独立読戻し済み。親の統合Taskと依頼へ最終結果を戻し、今回の工程を閉じる。
+
+| 対象（リンク） | 状態 | 確認方法 |
+|---|---|---|
+| [適用値・対象範囲](https://github.com/YuShimoji/WindowSlu/commit/1abffc4e14f646fa568548059c33c31ec86f4f43) | 表示値を適用、単体・グループ・全体と件数を明示。全体100%復帰は選択に依存しない | 専用HWNDで単体37%・グループ63%・全体45%と100%復帰、対象外不変。プリセット条件・未選択案内を確認 |
+| [回復・キー操作・検索・支援技術の成果](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-improvement-20261104/worker/RESULT.md>) | Undoを保存先まで復帰、1pxのキーサイズ変更、検索から対応操作行を可視化、主要UIA取得を修正 | 保存失敗・再試行・再読込・hotkey登録復帰、背景列挙待ち中の入力、画面外の検索対象とフォーカス維持、実画面の右矢印・Tab・適用結果、5タブUIAを確認 |
+| [最終TRX](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-improvement-20261104/worker/tests/final.trx>) / [コード検証CI](https://github.com/YuShimoji/WindowSlu/actions/runs/41698574052) | ローカル51成功・0失敗・0skip、97206d4のCIも成功 | TabControlから実UIAと同じ階層でpeerを辿る検証へ修正。製品ソースは1abffc4から不変 |
+| [最終描画](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-improvement-20261104/worker/screens-final/>) | 525×700・800×700の5タブとDark/Lightを確認 | 選択値・候補の文字色を確認。見えるつまみ14pxと透明ヒット領域28px、展開26×28、入力・適用高さ28以上を検証 |
+| [起動ファイル](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-improvement-20261104/worker/publish/WindowSlu.exe>) / [同一性記録](<C:/Users/thank/Storage/App Projects/WindowSlu/artifacts/ui-improvement-20261104/worker/publish-verification.json>) | 自己完結・single-file・ReadyToRunのRelease publish成功 | SHA256 `732BEC52A20FB98313C8E8EDBC2ADB5BCBB2817FBBD7A0038A2642C29BF60ABD`、製品tree `b6f764e3efd4b4edf782b1b002660cd068ed810e`を親が照合 |
+
+製品実装は `1abffc4`、テスト側の追修正は `97206d4`としてorigin/masterへ通常push済み。初回CI失敗はUIAクライアント未接続時にTabItemラッパーだけを調べた検証経路の問題で、主要コントロール名のassertを維持しTabControl起点へ修正してCI成功を確認した。親は製品ソースの差分がないことを確認し、テスト修正だけの再publishは行っていない。
+
+publishは実装commit前の作業ツリーから生成したため埋込ProductVersionには直前の8ba6981が入るが、製品内容は1abffc4相当。正確な同一性は上記SHA256・製品tree・publish記録で判定する。
+
+- 制限: Undo履歴は現在のセッション内。Undoで復帰・保存した項目は再起動後も残る。
+- 制限: 起動中の通常版と利用者profileは変更しない。今回の起動ファイルは上記専用publish先へ提供した。
+未確認: 本人の使いやすさ・疲労・完了時間の実測と受入、全スクリーンリーダー適合、混在DPI・全外部アプリの制約、Undoホットキーの実OS競合、Recordinatorの別端末同期。
 
 ## 2026-11-02 上下・左右の分割配置（実装・ローカル検証完了）
 
